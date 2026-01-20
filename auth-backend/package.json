@@ -1,0 +1,17 @@
+{
+  "name": "avatar-auth-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "jose": "^5.9.6",
+    "openid-client": "^5.7.1"
+  }
+}
