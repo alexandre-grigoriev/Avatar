@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* optional: your brand tokens */
+:root{
+  --brand-bg:#0b1c2d;
+  --brand-panel:#0f2a44;
+  --brand-accent:#00b3a4;
+}
