@@ -52,20 +52,46 @@ function TopSelect({
   options: { id: string; name: string }[];
   onChange: (v: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const selectedOption = options.find((o) => o.id === value);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [open]);
+
   return (
-    <div className="topSelect">
-      <div className="topSelectIcon">{icon}</div>
-      <div className="topSelectLabel">{label}:</div>
-      <div className="topSelectControl">
-        <select value={value} onChange={(e) => onChange(e.target.value)} className="topSelectNative">
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+    <div className="topSelectWrap" ref={wrapRef}>
+      <button className="topSelectBtn" onClick={() => setOpen((v) => !v)}>
+        <div className="topSelectIcon">{icon}</div>
+        <div className="topSelectLabel">{label}:</div>
+        <div className="topSelectValue">{selectedOption?.name ?? "Select..."}</div>
         <ChevronDown className="topSelectChevron" />
-      </div>
+      </button>
+      {open && (
+        <div className="topSelectDropdown">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              className={cn("topSelectDropdownItem", o.id === value && "topSelectDropdownItemActive")}
+              onClick={() => {
+                onChange(o.id);
+                setOpen(false);
+              }}
+            >
+              {o.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -519,12 +545,10 @@ function ChatPanel({
   open,
   onClose,
   panelMode,
-  setPanelMode,
 }: {
   open: boolean;
   onClose: () => void;
   panelMode: "discussion" | "quiz";
-  setPanelMode: (m: "discussion" | "quiz") => void;
 }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([
@@ -547,24 +571,13 @@ function ChatPanel({
     <Card className="rightCard">
       <div className="rightHeader">
         <div>
-          <div className="font-semibold">Horiba Assistant</div>
-          <div className="text-xs text-gray-500">{panelMode === "quiz" ? "Quiz" : "Discussion"}</div>
+          <div className="rightTitle">HORIBA Assistant</div>
+          <div className="rightSub">{panelMode === "quiz" ? "Quiz" : "Discussion"}</div>
         </div>
 
-        <div className="rightHeaderBtns">
-          <button
-            className={cn("smallTabBtn", panelMode === "discussion" && "smallTabBtnActive")}
-            onClick={() => setPanelMode("discussion")}
-          >
-            Discussion
-          </button>
-          <button className={cn("smallTabBtn", panelMode === "quiz" && "smallTabBtnActive")} onClick={() => setPanelMode("quiz")}>
-            Quiz
-          </button>
-          <button className="iconBtn" onClick={onClose} title="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <button className="iconBtn" onClick={onClose} title="Close">
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="rightBody">
@@ -766,12 +779,22 @@ export default function App() {
                 <button className="ghostBtn" onClick={() => setPresentationDialogOpen(true)}>
                   Select...
                 </button>
-                <button className="ghostBtn" onClick={openDiscussion}>
-                  Discussion
-                </button>
-                <button className="ghostBtn" onClick={openQuiz}>
-                  Quiz
-                </button>
+                <div className="modeTabs">
+                  <button
+                    className={cn("modeTab", panelMode === "discussion" && "modeTabActive")}
+                    onClick={openDiscussion}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Discussion</span>
+                  </button>
+                  <button
+                    className={cn("modeTab", panelMode === "quiz" && "modeTabActive")}
+                    onClick={openQuiz}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Quiz</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="leftHeaderBtns">
@@ -811,7 +834,6 @@ export default function App() {
           open={rightOpen}
           onClose={() => setRightOpen(false)}
           panelMode={panelMode}
-          setPanelMode={setPanelMode}
         />
       </main>
 
