@@ -204,6 +204,12 @@ function PresentationDialog({
   const [lang, setLang] = useState(defaultLang);
   const [file, setFile] = useState<File | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+
+  const selectedLang = useMemo(
+    () => LANGS.find((l) => l.id === lang),
+    [lang]
+  );
 
   const selectedPresentation = useMemo(
     () => MOCK_PRESENTATIONS.find((p) => p.id === existingId),
@@ -324,18 +330,29 @@ function PresentationDialog({
                     <div className="presFieldRow">
                       <div className="presFieldLabel">Presentation language</div>
                       <div className="presSelectWrap">
-                        <select
-                          className="presFieldSelect"
-                          value={lang}
-                          onChange={(e) => setLang(e.target.value)}
+                        <button
+                          className="presSelectBtn"
+                          onClick={() => setLangDropdownOpen((v) => !v)}
                         >
-                          {LANGS.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="presSelectChevron" />
+                          <span>{selectedLang?.name ?? "Select language..."}</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        {langDropdownOpen && (
+                          <div className="presDropdown">
+                            {LANGS.map((l) => (
+                              <button
+                                key={l.id}
+                                className={cn("presDropdownItem", l.id === lang && "presDropdownItemActive")}
+                                onClick={() => {
+                                  setLang(l.id);
+                                  setLangDropdownOpen(false);
+                                }}
+                              >
+                                {l.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
