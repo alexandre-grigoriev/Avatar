@@ -422,6 +422,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   background: #3b82f6;
   border-color: #3b82f6;
 }
+.presModeBtnActive:hover{ background: #2563eb; }
 .presModeBtnActive .presModeBtnTitle,
 .presModeBtnActive .presModeBtnDesc{ color: #fff; }
 .presModeBtnTitle{ font-size: 16px; font-weight: 500; color: #111827; }
