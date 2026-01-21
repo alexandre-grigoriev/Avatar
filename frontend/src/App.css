@@ -154,8 +154,30 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   gap: 14px;
   min-height: 0;
 }
-.gridWithRight{ grid-template-columns: 1fr 420px; }
+.gridWithRight{ grid-template-columns: 1fr auto 420px; }
 .gridNoRight{ grid-template-columns: 1fr; }
+
+/* Splitter */
+.splitter{
+  width: 20px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 -10px;
+  z-index: 5;
+}
+.splitterLine{
+  width: 6px;
+  height: 60px;
+  background: #d1d5db;
+  border-radius: 3px;
+  transition: background 0.15s, transform 0.15s;
+}
+.splitter:hover .splitterLine{
+  background: var(--blue);
+  transform: scaleY(1.2);
+}
 
 .cardLite{
   background:var(--card);

@@ -634,6 +634,10 @@ export default function App() {
   const [rightOpen, setRightOpen] = useState(true);
   const [panelMode, setPanelMode] = useState<"discussion" | "quiz">("discussion");
 
+  const [rightPanelWidth, setRightPanelWidth] = useState(420);
+  const isDragging = useRef(false);
+  const mainGridRef = useRef<HTMLElement>(null);
+
   const [presentationDialogOpen, setPresentationDialogOpen] = useState(false);
   const [activePresentationId, setActivePresentationId] = useState<string | null>(null);
   const [activePresentationLabel, setActivePresentationLabel] = useState<string>("No presentation selected");
@@ -697,6 +701,39 @@ export default function App() {
     setRightOpen(true);
     setPanelMode("quiz");
   }
+
+  // Splitter drag handlers
+  function handleSplitterMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!isDragging.current || !mainGridRef.current) return;
+      const gridRect = mainGridRef.current.getBoundingClientRect();
+      const newWidth = gridRect.right - e.clientX;
+      // Clamp between 300 and 600
+      setRightPanelWidth(Math.max(300, Math.min(600, newWidth)));
+    }
+
+    function handleMouseUp() {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    }
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   return (
     <div className="appRoot">
@@ -763,7 +800,11 @@ export default function App() {
       </header>
 
       {/* main content */}
-      <main className={cn("mainGrid", rightOpen ? "gridWithRight" : "gridNoRight")}>
+      <main
+        ref={mainGridRef}
+        className={cn("mainGrid", rightOpen ? "gridWithRight" : "gridNoRight")}
+        style={rightOpen ? { gridTemplateColumns: `1fr auto ${rightPanelWidth}px` } : undefined}
+      >
         {/* left area */}
         <Card className="leftCard">
           <div className="leftHeader">
@@ -828,6 +869,13 @@ export default function App() {
             )}
           </div>
         </Card>
+
+        {/* splitter */}
+        {rightOpen && (
+          <div className="splitter" onMouseDown={handleSplitterMouseDown}>
+            <div className="splitterLine" />
+          </div>
+        )}
 
         {/* right panel */}
         <ChatPanel
