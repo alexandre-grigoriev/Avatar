@@ -813,9 +813,9 @@ export default function App() {
           panelMode={panelMode}
           setPanelMode={setPanelMode}
         />
-
-        <div className="footerNote">HORIBA FRANCE 2026. ALL RIGHTS RESERVED</div>
       </main>
+
+      <div className="footerNote">HORIBA FRANCE 2026. ALL RIGHTS RESERVED</div>
 
       <PresentationDialog
         open={presentationDialogOpen}
