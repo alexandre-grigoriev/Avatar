@@ -715,8 +715,9 @@ export default function App() {
       if (!isDragging.current || !mainGridRef.current) return;
       const gridRect = mainGridRef.current.getBoundingClientRect();
       const newWidth = gridRect.right - e.clientX;
-      // Clamp between 300 and 600
-      setRightPanelWidth(Math.max(300, Math.min(600, newWidth)));
+      // Clamp between 300 and half of the screen
+      const maxWidth = gridRect.width / 2;
+      setRightPanelWidth(Math.max(300, Math.min(maxWidth, newWidth)));
     }
 
     function handleMouseUp() {
@@ -741,9 +742,7 @@ export default function App() {
       <header className="topBar">
         <div className="topBarInner">
           <div className="brandLeft">
-            {/* Put real files in /public */}
-            <img className="brandHoriba" src="/horiba-logo.svg" alt="HORIBA" onError={(e) => ((e.currentTarget.style.display = "none"))} />
-            <img className="brandLab" src="/ai-lab-logo.svg" alt="AI LAB" onError={(e) => ((e.currentTarget.style.display = "none"))} />
+            <img className="brandHoriba" src="/screen logo Horiba.png" alt="HORIBA" />
           </div>
 
           <div className="topControls">
