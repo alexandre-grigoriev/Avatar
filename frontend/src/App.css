@@ -247,18 +247,42 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   display:flex;
   gap: 8px;
   align-items:center;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #fff;
+}
+.chatInputPlus{
+  font-size: 20px;
+  color: #9ca3af;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
 }
 .chatInput{
   flex:1;
-  border:1px solid var(--border);
-  background:#fff;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
   outline:none;
+  font-size: 15px;
 }
-.chatInput:focus{ border-color: rgba(22,119,255,0.5); box-shadow: 0 0 0 4px rgba(22,119,255,0.12); }
+.chatInput::placeholder{ color: #9ca3af; }
+.chatInputIconBtn{
+  border: none;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chatInputIconBtn:hover{ opacity: 0.7; }
+.chatInputIcon{
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
 
 /* slide placeholder */
 .slideWrap{ height:100%; display:flex; flex-direction:column; gap: 12px; }
@@ -297,8 +321,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .iconBtn:hover{ background:#f7f8fa; }
 
 .blueBtn{
-  border:1px solid rgba(22,119,255,0.35);
-  background: var(--blue);
+  border:1px solid #478cd0;
+  background: #478cd0;
   color:#fff;
   border-radius: 12px;
   padding: 10px 12px;
@@ -308,7 +332,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   justify-content:center;
   gap: 8px;
 }
-.blueBtn:hover{ filter: brightness(1.05); }
+.blueBtn:hover{ background: #5b9bda; border-color: #5b9bda; }
 
 .ghostBtn{
   border:1px solid var(--border);
@@ -416,7 +440,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   font-weight: 500;
   cursor:pointer;
 }
-.authContinue:hover{ background: #2563eb; }
+.authContinue:hover{ background: #5b9bda; }
 
 .authFooter{ margin-top: 20px; font-size: 16px; text-align:center; color:#6b7280; }
 .authLink{ font-weight: 600; color: #478cd0; cursor: pointer; }
@@ -474,7 +498,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   background: #478cd0;
   border-color: #478cd0;
 }
-.presModeBtnActive:hover{ background: #2563eb; }
+.presModeBtnActive:hover{ background: #5b9bda; }
 .presModeBtnActive .presModeBtnTitle,
 .presModeBtnActive .presModeBtnDesc{ color: #fff; }
 .presModeBtnTitle{ font-size: 17px; font-weight: 500; color: #111827; }
@@ -590,7 +614,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   font-size: 16px;
   cursor: pointer;
 }
-.presFileBtn:hover{ background: #2563eb; }
+.presFileBtn:hover{ background: #5b9bda; }
 .presFileInput{
   display: none;
 }
@@ -619,7 +643,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   color: #fff;
   cursor: pointer;
 }
-.presSubmitBtn:hover{ background: #2563eb; }
+.presSubmitBtn:hover{ background: #5b9bda; }
 
 /* quiz */
 .quizWrap{ display:flex; flex-direction:column; gap: 10px; }

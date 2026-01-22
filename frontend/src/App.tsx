@@ -8,8 +8,6 @@ import {
   MonitorPlay,
   MessageSquare,
   CheckCircle2,
-  Send,
-  Mic,
   Settings,
   Play,
   SkipBack,
@@ -600,19 +598,23 @@ function ChatPanel({
             </div>
 
             <div className="chatInputRow">
-              <button className="iconBtn" title="Voice">
-                <Mic className="h-4 w-4" />
-              </button>
+              <span className="chatInputPlus">+</span>
               <input
                 className="chatInput"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => (e.key === "Enter" ? send() : null)}
+                onKeyDown={(e) => (e.key === "Enter" && input.trim() ? send() : null)}
                 placeholder="Type your message..."
               />
-              <button className="blueBtn" onClick={send}>
-                <Send className="h-4 w-4" />
-              </button>
+              {input.trim() ? (
+                <button className="chatInputIconBtn" onClick={send} title="Send">
+                  <img src="/send.png" alt="Send" className="chatInputIcon" />
+                </button>
+              ) : (
+                <button className="chatInputIconBtn" title="Voice">
+                  <img src="/microphone.png" alt="Mic" className="chatInputIcon" />
+                </button>
+              )}
             </div>
           </>
         )}
