@@ -39,13 +39,15 @@ function cn(...classes: Array<string | false | undefined | null>) {
 
 function TopSelect({
   icon,
+  imgSrc,
   label,
   value,
   options,
   onChange,
 }: {
-  icon: React.ReactNode;
-  label: string;
+  icon?: React.ReactNode;
+  imgSrc?: string;
+  label?: string;
   value: string;
   options: { id: string; name: string }[];
   onChange: (v: string) => void;
@@ -69,8 +71,12 @@ function TopSelect({
   return (
     <div className="topSelectWrap" ref={wrapRef}>
       <button className="topSelectBtn" onClick={() => setOpen((v) => !v)}>
-        <div className="topSelectIcon">{icon}</div>
-        <div className="topSelectLabel">{label}:</div>
+        {imgSrc ? (
+          <img src={imgSrc} alt="" className="topSelectImg" />
+        ) : icon ? (
+          <div className="topSelectIcon">{icon}</div>
+        ) : null}
+        {label && <div className="topSelectLabel">{label}:</div>}
         <div className="topSelectValue">{selectedOption?.name ?? "Select..."}</div>
         <ChevronDown className="topSelectChevron" />
       </button>
@@ -598,7 +604,6 @@ function ChatPanel({
             </div>
 
             <div className="chatInputRow">
-              <span className="chatInputPlus">+</span>
               <input
                 className="chatInput"
                 value={input}
@@ -748,8 +753,8 @@ export default function App() {
           </div>
 
           <div className="topControls">
-            <TopSelect icon={<UserRound className="h-4 w-4" />} label="Person" value={avatar} options={AVATARS} onChange={setAvatar} />
-            <TopSelect icon={<span className="globeDot" />} label="Language" value={lang} options={LANGS} onChange={setLang} />
+            <TopSelect imgSrc="/person.png" value={avatar} options={AVATARS} onChange={setAvatar} />
+            <TopSelect imgSrc="/language.png" value={lang} options={LANGS} onChange={setLang} />
             <ModeTabs view={view} setView={setView} />
           </div>
 
