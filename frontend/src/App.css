@@ -22,9 +22,11 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   z-index: 20;
   background: #ffffff;
   border-bottom: 1px solid var(--border);
+  margin-left: -50px;
+  margin-right: -50px;
 }
 .topBarInner{
-  padding: 10px 0;
+  padding: 10px 50px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -46,14 +48,14 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   border-radius: 8px;
   padding: 8px 12px;
   background: #fff;
-  font-size: 15px;
+  font-size: 16px;
   color: #111827;
   cursor: pointer;
 }
 .topSelectBtn:hover{ background: #f9fafb; }
 .topSelectIcon{ width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; color: #374151; background: #f7f8fa; border: 1px solid var(--border); }
-.topSelectLabel{ font-size: 15px; color: #6b7280; }
-.topSelectValue{ font-size: 15px; color: #111827; }
+.topSelectLabel{ font-size: 16px; color: #6b7280; }
+.topSelectValue{ font-size: 16px; color: #111827; }
 .topSelectChevron{ width: 16px; height: 16px; color: #6b7280; flex-shrink: 0; }
 .topSelectDropdown{
   position: absolute;
@@ -73,7 +75,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   border: none;
   background: transparent;
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: 16px;
   color: #111827;
   cursor: pointer;
   text-align: left;
@@ -98,7 +100,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   display:flex;
   align-items:center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color:#374151;
   cursor:pointer;
 }
@@ -129,8 +131,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   color:#374151;
 }
 .userText{ display:flex; flex-direction:column; line-height:1.1; text-align:left; }
-.userName{ font-size: 13px; font-weight: 600; color:#111827; }
-.userEmail{ font-size: 11px; color:#6b7280; }
+.userName{ font-size: 14px; font-weight: 600; color:#111827; }
+.userEmail{ font-size: 12px; color:#6b7280; }
 
 .userMenu{
   position:absolute;
@@ -195,8 +197,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   align-items:center;
   gap: 10px;
 }
-.leftTitle{ font-size: 18px; font-weight: 500; color: #111827; }
-.leftSub{ font-size: 15px; color: #6b7280; margin-top: 4px; }
+.leftTitle{ font-size: 19px; font-weight: 500; color: #111827; }
+.leftSub{ font-size: 16px; color: #6b7280; margin-top: 4px; }
 .leftHeaderBtns{ display:flex; gap: 30px; align-items:center; margin-left: auto; margin-right: 30px; }
 
 .leftBody{ padding: 14px; flex: 1; }
@@ -210,15 +212,15 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   align-items:center;
   gap: 10px;
 }
-.rightTitle{ font-size: 18px; font-weight: 500; color: #111827; }
-.rightSub{ font-size: 15px; color: #6b7280; margin-top: 4px; }
+.rightTitle{ font-size: 19px; font-weight: 500; color: #111827; }
+.rightSub{ font-size: 16px; color: #6b7280; margin-top: 4px; }
 .rightHeaderBtns{ display:flex; gap: 8px; align-items:center; }
 .smallTabBtn{
   border:1px solid var(--border);
   background:#f7f8fa;
   border-radius: 10px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 13px;
   cursor:pointer;
 }
 .smallTabBtnActive{
@@ -234,9 +236,9 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .msgRow{ margin-bottom: 14px; }
 .msgRowUser{ text-align:right; }
 .msgRowAsst{ text-align:left; }
-.msgMeta{ font-size: 11px; color: var(--muted); display:flex; gap: 10px; justify-content:space-between; margin-bottom: 6px; }
+.msgMeta{ font-size: 12px; color: var(--muted); display:flex; gap: 10px; justify-content:space-between; margin-bottom: 6px; }
 .msgRole{ font-weight:700; letter-spacing:0.02em; }
-.msgBubble{ display:inline-block; max-width: 95%; padding: 10px 12px; border-radius: 14px; border:1px solid var(--border); font-size: 13px; line-height:1.35; }
+.msgBubble{ display:inline-block; max-width: 95%; padding: 10px 12px; border-radius: 14px; border:1px solid var(--border); font-size: 14px; line-height:1.35; }
 .msgBubbleAsst{ background:#ffffff; }
 .msgBubbleUser{ background: rgba(22,119,255,0.12); border-color: rgba(22,119,255,0.25); }
 
@@ -327,7 +329,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 /* footer note */
 .footerNote{
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   text-align:center;
   padding: 14px 0;
@@ -363,8 +365,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .authCloseBtn:hover{ color: #111827; }
 
 .authHeader{ padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-.authTitle{ font-size: 18px; font-weight: 500; text-align: left; color:#111827; margin-bottom: 4px; }
-.authSubtitle{ font-size: 15px; text-align: left; color:#6b7280; }
+.authTitle{ font-size: 19px; font-weight: 500; text-align: left; color:#111827; margin-bottom: 4px; }
+.authSubtitle{ font-size: 16px; text-align: left; color:#6b7280; }
 
 .authProviderBtn{
   width:100%;
@@ -377,7 +379,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   justify-content:center;
   gap: 12px;
   cursor:pointer;
-  font-size: 16px;
+  font-size: 17px;
   color: #111827;
 }
 .authProviderBtn:hover{ background:#f9fafb; }
@@ -387,17 +389,17 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 
 .authOrRow{ display:flex; align-items:center; gap: 16px; margin: 20px 0; }
 .authOrLine{ height:1px; background:#e5e7eb; flex:1; }
-.authOrText{ font-size: 15px; color:#9ca3af; }
+.authOrText{ font-size: 16px; color:#9ca3af; }
 
 .authField{ margin-top: 4px; }
-.authLabel{ font-size: 15px; color:#374151; margin-bottom: 8px; }
+.authLabel{ font-size: 16px; color:#374151; margin-bottom: 8px; }
 .authInput{
   width:100%;
   border:1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
   outline:none;
-  font-size: 16px;
+  font-size: 17px;
 }
 .authInput::placeholder{ color: #9ca3af; }
 .authInput:focus{ border-color: rgba(22,119,255,0.45); box-shadow: 0 0 0 4px rgba(22,119,255,0.12); }
@@ -410,17 +412,17 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   padding: 14px 16px;
   background: #3b82f6;
   color:#fff;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   cursor:pointer;
 }
 .authContinue:hover{ background: #2563eb; }
 
-.authFooter{ margin-top: 20px; font-size: 15px; text-align:center; color:#6b7280; }
+.authFooter{ margin-top: 20px; font-size: 16px; text-align:center; color:#6b7280; }
 .authLink{ font-weight: 600; color: #3b82f6; cursor: pointer; }
 .authLink:hover{ text-decoration: underline; }
 
-.authLegal{ margin-top: 16px; font-size: 14px; color:#9ca3af; text-align:center; }
+.authLegal{ margin-top: 16px; font-size: 15px; color:#9ca3af; text-align:center; }
 .authLegalLink{ color: #6b7280; cursor: pointer; }
 .authLegalLink:hover{ text-decoration: underline; }
 .authLegalDot{ color: #d1d5db; }
@@ -451,8 +453,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .presCloseBtn:hover{ color: #111827; }
 
 .presModalHeader{ padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-.presModalTitle{ font-size: 18px; font-weight: 500; color: #111827; margin-bottom: 4px; text-align: left; }
-.presModalSubtitle{ font-size: 15px; color: #6b7280; text-align: left; }
+.presModalTitle{ font-size: 19px; font-weight: 500; color: #111827; margin-bottom: 4px; text-align: left; }
+.presModalSubtitle{ font-size: 16px; color: #6b7280; text-align: left; }
 
 .presModeRow{ display: flex; gap: 16px; margin-bottom: 24px; }
 .presModeBtn{
@@ -475,12 +477,12 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .presModeBtnActive:hover{ background: #2563eb; }
 .presModeBtnActive .presModeBtnTitle,
 .presModeBtnActive .presModeBtnDesc{ color: #fff; }
-.presModeBtnTitle{ font-size: 16px; font-weight: 500; color: #111827; }
-.presModeBtnDesc{ font-size: 14px; color: #6b7280; }
+.presModeBtnTitle{ font-size: 17px; font-weight: 500; color: #111827; }
+.presModeBtnDesc{ font-size: 15px; color: #6b7280; }
 
 .presForm{ margin-bottom: 24px; }
 .presFieldRow{ margin-bottom: 16px; }
-.presFieldLabel{ font-size: 15px; color: #374151; margin-bottom: 8px; }
+.presFieldLabel{ font-size: 16px; color: #374151; margin-bottom: 8px; }
 .presFieldInput{
   width: 100%;
   border: 1px solid var(--border);
@@ -488,7 +490,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   padding: 12px 14px;
   outline: none;
   background: #fff;
-  font-size: 16px;
+  font-size: 17px;
 }
 .presFieldInput::placeholder{ color: #9ca3af; }
 .presFieldInput:focus{ border-color: rgba(22,119,255,0.45); box-shadow: 0 0 0 4px rgba(22,119,255,0.12); }
@@ -500,7 +502,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   border-radius: 8px;
   padding: 12px 14px;
   background: #fff;
-  font-size: 16px;
+  font-size: 17px;
   color: #111827;
   cursor: pointer;
   display: flex;
@@ -518,7 +520,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   padding: 12px 14px;
   padding-right: 36px;
   background: #fff;
-  font-size: 16px;
+  font-size: 17px;
   color: #111827;
   cursor: pointer;
   appearance: none;
@@ -554,7 +556,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   border: none;
   background: transparent;
   padding: 12px 14px;
-  font-size: 16px;
+  font-size: 17px;
   color: #111827;
   cursor: pointer;
   text-align: left;
@@ -568,9 +570,9 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   padding: 16px;
   background: #fff;
 }
-.presPreviewTitle{ font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 4px; }
-.presPreviewDesc{ font-size: 15px; color: #6b7280; margin-bottom: 4px; }
-.presPreviewLang{ font-size: 14px; color: #9ca3af; }
+.presPreviewTitle{ font-size: 17px; font-weight: 600; color: #111827; margin-bottom: 4px; }
+.presPreviewDesc{ font-size: 16px; color: #6b7280; margin-bottom: 4px; }
+.presPreviewLang{ font-size: 15px; color: #9ca3af; }
 
 .presFileUpload{
   display: flex;
@@ -585,7 +587,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   background: #3b82f6;
   color: #fff;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 16px;
   cursor: pointer;
 }
 .presFileBtn:hover{ background: #2563eb; }
@@ -593,7 +595,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   display: none;
 }
 .presFileName{
-  font-size: 15px;
+  font-size: 16px;
   color: #6b7280;
 }
 
@@ -603,7 +605,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   background: #fff;
   border-radius: 8px;
   padding: 12px 24px;
-  font-size: 16px;
+  font-size: 17px;
   color: #374151;
   cursor: pointer;
 }
@@ -613,7 +615,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   background: #3b82f6;
   border-radius: 8px;
   padding: 12px 24px;
-  font-size: 16px;
+  font-size: 17px;
   color: #fff;
   cursor: pointer;
 }
