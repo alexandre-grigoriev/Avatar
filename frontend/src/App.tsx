@@ -867,11 +867,13 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="leftHeaderBtns">
-                <button className="ghostBtn" onClick={openDiscussion}>
-                  Discussion
-                </button>
-              </div>
+              !rightOpen && (
+                <div className="leftHeaderBtns">
+                  <button className="ghostBtn" onClick={openDiscussion}>
+                    Chat
+                  </button>
+                </div>
+              )
             )}
 
             <button className="iconBtn" onClick={() => setRightOpen((v) => !v)} title={rightOpen ? "Hide panel" : "Show panel"}>
