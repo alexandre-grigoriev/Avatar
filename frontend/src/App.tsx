@@ -2,17 +2,18 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown,
-  UserRound,
   LogOut,
   X,
-  MonitorPlay,
-  MessageSquare,
   CheckCircle2,
   Settings,
   Play,
   SkipBack,
   SkipForward,
   XCircle,
+  Shield,
+  Building2,
+  Star,
+  User,
 } from "lucide-react";
 import "./App.css";
 
@@ -32,6 +33,32 @@ const MOCK_PRESENTATIONS = [
   { id: "safety_intro", name: "Safety onboarding", lang: "en", description: "Safety for interns" },
   { id: "qc_basics", name: "QC Basics", lang: "fr", description: "Quality control overview" },
 ];
+
+const ADMIN_EMAILS = ["alexandre.grigoriev@gmail.com", "alexandre.grigoriev@horiba.com"];
+const TRUSTED_USERS: string[] = []; // Add trusted user emails here
+
+function getUserStatus(email: string | undefined): string {
+  if (!email) return "Guest";
+  const lowerEmail = email.toLowerCase();
+  if (ADMIN_EMAILS.includes(lowerEmail)) return "Admin";
+  if (lowerEmail.endsWith("@horiba.com")) return "HORIBA user";
+  if (TRUSTED_USERS.includes(lowerEmail)) return "Trusted user";
+  return "Guest";
+}
+
+function UserStatusIcon({ email, className }: { email: string | undefined; className?: string }) {
+  const status = getUserStatus(email);
+  switch (status) {
+    case "Admin":
+      return <Shield className={className} />;
+    case "HORIBA user":
+      return <Building2 className={className} />;
+    case "Trusted user":
+      return <Star className={className} />;
+    default:
+      return <User className={className} />;
+  }
+}
 
 function cn(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
@@ -103,16 +130,14 @@ function TopSelect({
 function ModeTabs({ view, setView }: { view: "chat" | "presentation"; setView: (v: "chat" | "presentation") => void }) {
   return (
     <div className="modeTabs">
-      <button className={cn("modeTab", view === "chat" && "modeTabActive")} onClick={() => setView("chat")}>
-        <MessageSquare className="h-4 w-4" />
-        <span>Chat</span>
-      </button>
       <button
         className={cn("modeTab", view === "presentation" && "modeTabActive")}
         onClick={() => setView("presentation")}
       >
-        <MonitorPlay className="h-4 w-4" />
-        <span>Presentation</span>
+        Presentation
+      </button>
+      <button className={cn("modeTab", view === "chat" && "modeTabActive")} onClick={() => setView("chat")}>
+        Chat
       </button>
     </div>
   );
@@ -761,11 +786,11 @@ export default function App() {
           <div className="topRight" ref={userMenuRef}>
             <button className="userBtn" onClick={() => setUserMenuOpen((v) => !v)} title={user?.email ?? "Sign in"}>
               <span className="userAvatar">
-                <UserRound className="h-4 w-4" />
+                <UserStatusIcon email={user?.email} className="h-5 w-5" />
               </span>
               <span className="userText">
                 <span className="userName">{user?.name ?? "Guest"}</span>
-                <span className="userEmail">{user?.email ?? "Not signed in"}</span>
+                <span className="userEmail">{user?.email ?? ""}</span>
               </span>
               <ChevronDown className="h-4 w-4 text-gray-600" />
             </button>
@@ -774,8 +799,8 @@ export default function App() {
               <div className="userMenu">
                 <div className="userMenuTop">
                   <div className="font-semibold">{user?.name ?? "Guest"}</div>
-                  <div className="text-xs text-gray-500">{user?.email ?? "Please sign in"}</div>
-                  {user && <div className="text-[11px] text-gray-400 mt-1">Provider: {user.provider}</div>}
+                  <div className="text-[13px] text-gray-500">{user?.email ?? "Please sign in"}</div>
+                  <div className="text-[14px] font-bold text-gray-400 mt-1">{getUserStatus(user?.email)}</div>
                 </div>
 
                 <div className="userMenuActions">
@@ -831,15 +856,13 @@ export default function App() {
                     className={cn("modeTab", panelMode === "discussion" && "modeTabActive")}
                     onClick={openDiscussion}
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    <span>Discussion</span>
+                    Discussion
                   </button>
                   <button
                     className={cn("modeTab", panelMode === "quiz" && "modeTabActive")}
                     onClick={openQuiz}
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Quiz</span>
+                    Quiz
                   </button>
                 </div>
               </div>

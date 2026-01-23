@@ -86,29 +86,32 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .globeDot{ width: 12px; height: 12px; border-radius: 999px; background: #111827; display: inline-block; }
 
 .modeTabs{
-  background:#f7f8fa;
-  border:1px solid var(--border);
-  border-radius:999px;
-  padding: 4px;
   display:flex;
-  gap: 4px;
+  align-items:center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
 }
 .modeTab{
   border:none;
   background:transparent;
-  padding: 6px 10px;
+  padding: 8px 16px;
   border-radius:999px;
-  display:flex;
-  align-items:center;
-  gap: 6px;
-  font-size: 14px;
-  color:#374151;
+  font-size: 16px;
+  color:#6b7280;
   cursor:pointer;
 }
+.modeTab:hover{
+  color:#374151;
+}
 .modeTabActive{
-  background:#ffffff;
-  border:1px solid var(--border);
-  color:#111827;
+  background:#478cd0;
+  color:#fff;
+}
+.modeTabActive:hover{
+  background:#5b9bda;
+  color:#fff;
 }
 
 /* ===== user menu ===== */
@@ -127,13 +130,12 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   width: 28px; height: 28px;
   border-radius:999px;
   display:grid; place-items:center;
-  border:1px solid var(--border);
-  background:#f7f8fa;
+  background:transparent;
   color:#374151;
 }
 .userText{ display:flex; flex-direction:column; line-height:1.1; text-align:left; }
 .userName{ font-size: 14px; font-weight: 600; color:#111827; }
-.userEmail{ font-size: 14px; color:#6b7280; margin-top: 4px; }
+.userEmail{ font-size: 14px; font-weight: 600; color:#6b7280; margin-top: 3px; }
 
 .userMenu{
   position:absolute;
