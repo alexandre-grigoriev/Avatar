@@ -5,10 +5,6 @@ import {
   LogOut,
   X,
   CheckCircle2,
-  Settings,
-  Play,
-  SkipBack,
-  SkipForward,
   XCircle,
   Shield,
   Building2,
@@ -470,6 +466,7 @@ function PresentationDialog({
 
 function SlideViewport({ onEnd }: { onEnd: () => void }) {
   const [page, setPage] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
   const total = 18;
 
   return (
@@ -485,27 +482,42 @@ function SlideViewport({ onEnd }: { onEnd: () => void }) {
       </div>
 
       <div className="slideControls">
-        <button className="iconBtn" onClick={() => setPage((p) => Math.max(1, p - 1))}>
-          <SkipBack className="h-4 w-4" />
+        <button className="slideControlBtn" onClick={() => setPage(1)} title="Go to start">
+          <img src="/start.png" alt="Start" className="slideControlIcon" />
+        </button>
+
+        <button className="slideControlBtn" onClick={() => setPage((p) => Math.max(1, p - 1))} title="Previous slide">
+          <img src="/left.png" alt="Previous" className="slideControlIconLarge" />
         </button>
 
         <div className="progressBar">
           <div className="progressFill" style={{ width: `${(page / total) * 100}%` }} />
+          <div className="progressText">{page} / {total}</div>
         </div>
 
-        <button className="iconBtn" onClick={() => setPage((p) => Math.min(total, p + 1))}>
-          <SkipForward className="h-4 w-4" />
+        <button className="slideControlBtn" onClick={() => setPage((p) => Math.min(total, p + 1))} title="Next slide">
+          <img src="/right.png" alt="Next" className="slideControlIconLarge" />
+        </button>
+
+        <button className="slideControlBtn" onClick={() => setPage(total)} title="Go to end">
+          <img src="/end.png" alt="End" className="slideControlIcon" />
         </button>
 
         <button
-          className="playBtn"
+          className="slideControlBtn"
           onClick={() => {
-            if (page === total) onEnd();
-            else setPage(total);
+            if (isPlaying) {
+              setIsPlaying(false);
+            } else {
+              setIsPlaying(true);
+              if (page === total) {
+                onEnd();
+              }
+            }
           }}
+          title={isPlaying ? "Stop" : "Play"}
         >
-          <Play className="h-4 w-4" />
-          <span>{page === total ? "Stop" : "Play"}</span>
+          <img src={isPlaying ? "/stop.png" : "/play.png"} alt={isPlaying ? "Stop" : "Play"} className="slideControlIcon" />
         </button>
       </div>
     </div>
@@ -734,6 +746,14 @@ export default function App() {
     setPanelMode("quiz");
   }
 
+  // Change view and open HORIBA Assistant if closed
+  function handleViewChange(newView: "chat" | "presentation") {
+    setView(newView);
+    if (!rightOpen) {
+      setRightOpen(true);
+    }
+  }
+
   // Splitter drag handlers
   function handleSplitterMouseDown(e: React.MouseEvent) {
     e.preventDefault();
@@ -780,7 +800,7 @@ export default function App() {
           <div className="topControls">
             <TopSelect imgSrc="/person.png" value={avatar} options={AVATARS} onChange={setAvatar} />
             <TopSelect imgSrc="/language.png" value={lang} options={LANGS} onChange={setLang} />
-            <ModeTabs view={view} setView={setView} />
+            <ModeTabs view={view} setView={handleViewChange} />
           </div>
 
           <div className="topRight" ref={userMenuRef}>
@@ -876,9 +896,6 @@ export default function App() {
               )
             )}
 
-            <button className="iconBtn" onClick={() => setRightOpen((v) => !v)} title={rightOpen ? "Hide panel" : "Show panel"}>
-              {rightOpen ? <X className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
-            </button>
           </div>
 
           <div className="leftBody">
