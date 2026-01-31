@@ -180,7 +180,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   transition: background 0.15s, transform 0.15s;
 }
 .splitter:hover .splitterLine{
-  background: var(--blue);
+  background: #478CD0;
   transform: scaleY(1.2);
 }
 
@@ -361,7 +361,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 }
 .progressFill{
   height: 100%;
-  background: #478cd0;
+  background: #478CD0;
   border-radius: 999px;
   position: absolute;
   top: 0;
