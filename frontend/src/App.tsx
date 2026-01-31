@@ -481,44 +481,48 @@ function SlideViewport({ onEnd }: { onEnd: () => void }) {
         </div>
       </div>
 
-      <div className="slideControls">
-        <button className="slideControlBtn" onClick={() => setPage(1)} title="Go to start">
-          <img src="/start.png" alt="Start" className="slideControlIcon" />
-        </button>
+      <div className="slideControlsWrapper">
+        <div className="slideControlsTop">
+          <button className="slideControlBtn" onClick={() => setPage(1)} title="Go to start">
+            <img src="/start.png" alt="Start" className="slideControlIcon" />
+          </button>
 
-        <button className="slideControlBtn" onClick={() => setPage((p) => Math.max(1, p - 1))} title="Previous slide">
-          <img src="/left.png" alt="Previous" className="slideControlIconLarge" />
-        </button>
+          <button className="slideControlBtn" onClick={() => setPage((p) => Math.max(1, p - 1))} title="Previous slide">
+            <img src="/left.png" alt="Previous" className="slideControlIconLarge" />
+          </button>
 
-        <div className="progressBar">
-          <div className="progressFill" style={{ width: `${(page / total) * 100}%` }} />
-          <div className="progressText">{page} / {total}</div>
+          <div className="progressBar">
+            <div className="progressFill" style={{ width: `${(page / total) * 100}%` }} />
+            <div className="progressText">{page} of {total}</div>
+          </div>
+
+          <button className="slideControlBtn" onClick={() => setPage((p) => Math.min(total, p + 1))} title="Next slide">
+            <img src="/right.png" alt="Next" className="slideControlIconLarge" />
+          </button>
+
+          <button className="slideControlBtn" onClick={() => setPage(total)} title="Go to end">
+            <img src="/end.png" alt="End" className="slideControlIcon" />
+          </button>
         </div>
 
-        <button className="slideControlBtn" onClick={() => setPage((p) => Math.min(total, p + 1))} title="Next slide">
-          <img src="/right.png" alt="Next" className="slideControlIconLarge" />
-        </button>
-
-        <button className="slideControlBtn" onClick={() => setPage(total)} title="Go to end">
-          <img src="/end.png" alt="End" className="slideControlIcon" />
-        </button>
-
-        <button
-          className="slideControlBtn"
-          onClick={() => {
-            if (isPlaying) {
-              setIsPlaying(false);
-            } else {
-              setIsPlaying(true);
-              if (page === total) {
-                onEnd();
+        <div className="slideControlsBottom">
+          <button
+            className="slideControlBtn"
+            onClick={() => {
+              if (isPlaying) {
+                setIsPlaying(false);
+              } else {
+                setIsPlaying(true);
+                if (page === total) {
+                  onEnd();
+                }
               }
-            }
-          }}
-          title={isPlaying ? "Stop" : "Play"}
-        >
-          <img src={isPlaying ? "/stop.png" : "/play.png"} alt={isPlaying ? "Stop" : "Play"} className="slideControlIcon" />
-        </button>
+            }}
+            title={isPlaying ? "Stop" : "Play"}
+          >
+            <img src={isPlaying ? "/stop.png" : "/play.png"} alt={isPlaying ? "Stop" : "Play"} className="slideControlIcon" />
+          </button>
+        </div>
       </div>
     </div>
   );
