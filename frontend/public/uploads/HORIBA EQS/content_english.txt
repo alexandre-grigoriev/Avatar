@@ -1,0 +1,65 @@
+Hello and Welcome to Horiba France
+image:Diapositive1.bmp
+-------
+I am the Artificial Intelligence responsible for training you on EQS (Environment, Quality, and Safety).
+image:Diapositive2.bmp
+-------
+Today, we will cover several important points in the organization of the company: Quality, safety and risks related to your position; emergency situations and finally the impacts of our activity on the environment.
+image:Diapositive3.bmp
+-------
+INTRODUCTION
+image:Diapositive4.bmp
+-------
+Why Environment Quality Safety (EQS) training?
+
+The Labor Code imposes a general security obligation on the employer towards its employees. Thus, any newly hired person must receive safety training adapted to their workstation before taking up their position.
+
+Furthermore, according to the ISO (Quality) and ISO (Environment) standards, HORIBA France must ensure that all of its employees, from their arrival, receive appropriate training in order to:
+
+Guarantee the compliance of the products and services offered
+
+Understand the impact of their activity on the environment
+
+Adopt behaviors to avoid incidents
+
+Contribute to the overall performance of the company.
+
+image:Diapositive5.bmp
+-------
+Quality
+image:Diapositive6.bmp
+-------
+What is an EQS management system?
+
+HORIBA France is certified ISO and ISO for the Loos and Palaiseau sites. The Vénissieux site is in the process of certification.
+
+Why these certifications?
+
+The ISO certifications are voluntary approaches undertaken by HORIBA France with the aim of:
+
+Improving its internal performance
+
+Meeting the requirements of its customers and the market
+
+Enhancing its image through internationally recognized certifications, conveying the image of a serious, organized and responsible company
+
+Complying with legal obligations
+
+Anticipating risks and limiting incidents and workplace accidents
+
+The ISO standards define best practices for improving the organization of the company. These best practices are available on the HFR SharePoint portal, in the EQS space, under the "EQS Information" section.
+image:Diapositive7.bmp
+
+-------
+Safety Base: What can be found in this base? The safety base, more commonly known as the risk base, is accessible on the HFR SharePoint Portal: in the EQS item, under the "EQS Information - Security Activity" section. You will find:
+- The Single Professional Risk Assessment Document. This document is mandatory under the Labor Code. It lists all the risks to which employees are exposed.
+- The "training tools": the link to connect to the E-prevention online platform and a general training PowerPoint.
+- The risk sheets that detail the risks you are exposed to and inform you of the precautions to take to protect your health and safety as well as those around you.
+- The SDSs, "Safety Data Sheets for chemical products" which inform you of the dangers related to the use of these products.
+All this information is classified by work unit, to allow you to find it more easily.
+You will also find information about how to react in case of an emergency: Accident, alarm triggering, etc.
+image:Diapositive8.bmp
+-------
+Thank you for your attention and I remain at your disposal for any questions
+image:Diapositive9.bmp
+-------

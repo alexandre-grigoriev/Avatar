@@ -1,0 +1,92 @@
+{
+  "questions": [
+    {
+      "question": "What is the main purpose of HORIBA EQS?",
+      "type": "single",
+      "choices": [
+        "Manufacturing automotive parts",
+        "Environmental and Quality Solutions",
+        "Electric vehicle charging systems",
+        "Software development tools"
+      ],
+      "correctAnswers": [1]
+    },
+    {
+      "question": "Which industries does HORIBA EQS serve? (Select all that apply)",
+      "type": "multiple",
+      "choices": [
+        "Automotive",
+        "Environmental monitoring",
+        "Medical and healthcare",
+        "Gaming industry"
+      ],
+      "correctAnswers": [0, 1, 2]
+    },
+    {
+      "question": "What type of measurements does HORIBA EQS specialize in?",
+      "type": "single",
+      "choices": [
+        "Financial analysis",
+        "Emissions and environmental quality",
+        "Social media metrics",
+        "Building construction"
+      ],
+      "correctAnswers": [1]
+    },
+    {
+      "question": "Which technologies are part of HORIBA's EQS solutions? (Select all that apply)",
+      "type": "multiple",
+      "choices": [
+        "Gas analyzers",
+        "Particle measurement systems",
+        "Water quality analyzers",
+        "Video game consoles"
+      ],
+      "correctAnswers": [0, 1, 2]
+    },
+    {
+      "question": "What is HORIBA's primary commitment?",
+      "type": "single",
+      "choices": [
+        "Maximizing profits only",
+        "Environmental protection and quality assurance",
+        "Market domination",
+        "Social media presence"
+      ],
+      "correctAnswers": [1]
+    },
+    {
+      "question": "In which country is HORIBA France located?",
+      "type": "single",
+      "choices": [
+        "Germany",
+        "Italy",
+        "France",
+        "Spain"
+      ],
+      "correctAnswers": [2]
+    },
+    {
+      "question": "What are the key benefits of HORIBA EQS solutions? (Select all that apply)",
+      "type": "multiple",
+      "choices": [
+        "Regulatory compliance",
+        "Accurate measurements",
+        "Real-time monitoring",
+        "Free entertainment"
+      ],
+      "correctAnswers": [0, 1, 2]
+    },
+    {
+      "question": "Which emission standards does HORIBA help measure?",
+      "type": "single",
+      "choices": [
+        "Only European standards",
+        "Global emission standards (EURO, EPA, etc.)",
+        "Only Asian standards",
+        "No specific standards"
+      ],
+      "correctAnswers": [1]
+    }
+  ]
+}

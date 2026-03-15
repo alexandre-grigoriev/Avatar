@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TalkingHeadAvatar, { type TalkingHeadAvatarHandle } from "./TalkingHeadAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown,
@@ -10,9 +11,24 @@ import {
   Building2,
   Star,
   User,
+  Mic,
 } from "lucide-react";
 import "./App.css";
+import {
+  sendToGemini,
+  classifyIntent,
+  type ChatMessage,
+  type Presentation,
+} from "./services/gemini";
+import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface SlideData {
+  paragraphs: string[];
+  image: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 const AVATARS = [
   { id: "alan", name: "Alan" },
   { id: "ada", name: "Ada" },
@@ -24,35 +40,28 @@ const LANGS = [
   { id: "ar", name: "Arabic" },
 ];
 
-const MOCK_PRESENTATIONS = [
-  { id: "roadmap_ia_2026", name: "Roadmap IA 2026", lang: "fr", description: "AI Lab roadmap" },
-  { id: "safety_intro", name: "Safety onboarding", lang: "en", description: "Safety for interns" },
-  { id: "qc_basics", name: "QC Basics", lang: "fr", description: "Quality control overview" },
-];
+const LANG_NAMES: Record<string, string> = { en: "English", fr: "French", ar: "Arabic" };
+const LANG_TO_LONG: Record<string, string> = { en: "english", fr: "french", ar: "arabic" };
 
 const ADMIN_EMAILS = ["alexandre.grigoriev@gmail.com", "alexandre.grigoriev@horiba.com"];
-const TRUSTED_USERS: string[] = []; // Add trusted user emails here
+const TRUSTED_USERS: string[] = [];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getUserStatus(email: string | undefined): string {
   if (!email) return "Guest";
-  const lowerEmail = email.toLowerCase();
-  if (ADMIN_EMAILS.includes(lowerEmail)) return "Admin";
-  if (lowerEmail.endsWith("@horiba.com")) return "HORIBA user";
-  if (TRUSTED_USERS.includes(lowerEmail)) return "Trusted user";
+  const e = email.toLowerCase();
+  if (ADMIN_EMAILS.includes(e)) return "Admin";
+  if (e.endsWith("@horiba.com")) return "HORIBA user";
+  if (TRUSTED_USERS.includes(e)) return "Trusted user";
   return "Guest";
 }
 
 function UserStatusIcon({ email, className }: { email: string | undefined; className?: string }) {
-  const status = getUserStatus(email);
-  switch (status) {
-    case "Admin":
-      return <Shield className={className} />;
-    case "HORIBA user":
-      return <Building2 className={className} />;
-    case "Trusted user":
-      return <Star className={className} />;
-    default:
-      return <User className={className} />;
+  switch (getUserStatus(email)) {
+    case "Admin":        return <Shield className={className} />;
+    case "HORIBA user":  return <Building2 className={className} />;
+    case "Trusted user": return <Star className={className} />;
+    default:             return <User className={className} />;
   }
 }
 
@@ -60,16 +69,17 @@ function cn(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
 }
 
+// ─── TopSelect ────────────────────────────────────────────────────────────────
 function TopSelect({
-  icon,
   imgSrc,
+  icon,
   label,
   value,
   options,
   onChange,
 }: {
-  icon?: React.ReactNode;
   imgSrc?: string;
+  icon?: React.ReactNode;
   label?: string;
   value: string;
   options: { id: string; name: string }[];
@@ -77,18 +87,14 @@ function TopSelect({
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find((o) => o.id === value);
+  const selected = options.find((o) => o.id === value);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+    function onDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
+    if (open) document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
   return (
@@ -100,7 +106,7 @@ function TopSelect({
           <div className="topSelectIcon">{icon}</div>
         ) : null}
         {label && <div className="topSelectLabel">{label}:</div>}
-        <div className="topSelectValue">{selectedOption?.name ?? "Select..."}</div>
+        <div className="topSelectValue">{selected?.name ?? "Select..."}</div>
         <ChevronDown className="topSelectChevron" />
       </button>
       {open && (
@@ -109,10 +115,7 @@ function TopSelect({
             <button
               key={o.id}
               className={cn("topSelectDropdownItem", o.id === value && "topSelectDropdownItemActive")}
-              onClick={() => {
-                onChange(o.id);
-                setOpen(false);
-              }}
+              onClick={() => { onChange(o.id); setOpen(false); }}
             >
               {o.name}
             </button>
@@ -123,7 +126,14 @@ function TopSelect({
   );
 }
 
-function ModeTabs({ view, setView }: { view: "chat" | "presentation"; setView: (v: "chat" | "presentation") => void }) {
+// ─── ModeTabs ─────────────────────────────────────────────────────────────────
+function ModeTabs({
+  view,
+  setView,
+}: {
+  view: "chat" | "presentation";
+  setView: (v: "chat" | "presentation") => void;
+}) {
   return (
     <div className="modeTabs">
       <button
@@ -132,7 +142,10 @@ function ModeTabs({ view, setView }: { view: "chat" | "presentation"; setView: (
       >
         Presentation
       </button>
-      <button className={cn("modeTab", view === "chat" && "modeTabActive")} onClick={() => setView("chat")}>
+      <button
+        className={cn("modeTab", view === "chat" && "modeTabActive")}
+        onClick={() => setView("chat")}
+      >
         Chat
       </button>
     </div>
@@ -143,7 +156,7 @@ function Card({ children, className }: any) {
   return <div className={cn("cardLite", className)}>{children}</div>;
 }
 
-/** screen base 7 style (white card, Google/Email, close X) */
+// ─── AuthDialog ───────────────────────────────────────────────────────────────
 function AuthDialog({
   open,
   onBeginOAuth,
@@ -156,7 +169,6 @@ function AuthDialog({
   onClose?: () => void;
 }) {
   const [email, setEmail] = useState("");
-
   return (
     <AnimatePresence>
       {open && (
@@ -175,12 +187,10 @@ function AuthDialog({
                   <X className="h-5 w-5" />
                 </button>
               )}
-
               <div className="authHeader">
                 <div className="authTitle">Welcome</div>
                 <div className="authSubtitle">Sign in to access chat and presentations</div>
               </div>
-
               <button className="authProviderBtn" onClick={() => onBeginOAuth("google")}>
                 <svg className="authGoogleIcon" viewBox="0 0 24 24" width="20" height="20">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -190,13 +200,11 @@ function AuthDialog({
                 </svg>
                 <span>Log in with Google</span>
               </button>
-
               <div className="authOrRow">
                 <div className="authOrLine" />
                 <div className="authOrText">OR</div>
                 <div className="authOrLine" />
               </div>
-
               <div className="authField">
                 <div className="authLabel">Email</div>
                 <input
@@ -206,22 +214,15 @@ function AuthDialog({
                   placeholder="Enter your email address"
                 />
               </div>
-
               <button
                 className="authContinue"
-                onClick={() => {
-                  const v = email.trim();
-                  if (!v) return;
-                  onEmailContinue(v);
-                }}
+                onClick={() => { const v = email.trim(); if (v) onEmailContinue(v); }}
               >
                 Continue
               </button>
-
               <div className="authFooter">
                 Don&apos;t have an account? <span className="authLink">Sign up</span>
               </div>
-
               <div className="authLegal">
                 <span className="authLegalLink">Terms of Service</span>
                 <span className="authLegalDot"> · </span>
@@ -235,21 +236,25 @@ function AuthDialog({
   );
 }
 
+// ─── PresentationDialog ───────────────────────────────────────────────────────
 function PresentationDialog({
   open,
   onClose,
   onSelect,
   defaultLang,
+  presentations,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (payload:
-    | { mode: "existing"; id: string }
-    | { mode: "new"; name: string; description: string; lang: string; file?: File | null }) => void;
+    | { mode: "existing"; name: string }
+    | { mode: "new"; name: string; description: string; lang: string; file?: File | null }
+  ) => void;
   defaultLang: string;
+  presentations: Presentation[];
 }) {
   const [mode, setMode] = useState<"new" | "existing">("existing");
-  const [existingId, setExistingId] = useState(MOCK_PRESENTATIONS[0]?.id ?? "");
+  const [existingName, setExistingName] = useState(presentations[0]?.name ?? "");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [lang, setLang] = useState(defaultLang);
@@ -257,20 +262,18 @@ function PresentationDialog({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
 
-  const selectedLang = useMemo(
-    () => LANGS.find((l) => l.id === lang),
-    [lang]
-  );
+  useEffect(() => {
+    if (open) {
+      setLang(defaultLang);
+      if (presentations.length) setExistingName(presentations[0].name);
+    }
+  }, [open, defaultLang, presentations]);
 
   const selectedPresentation = useMemo(
-    () => MOCK_PRESENTATIONS.find((p) => p.id === existingId),
-    [existingId]
+    () => presentations.find((p) => p.name === existingName),
+    [existingName, presentations]
   );
-
-  useEffect(() => {
-    if (!open) return;
-    setLang(defaultLang);
-  }, [open, defaultLang]);
+  const selectedLang = useMemo(() => LANGS.find((l) => l.id === lang), [lang]);
 
   return (
     <AnimatePresence>
@@ -285,15 +288,11 @@ function PresentationDialog({
             className="presModalWrap"
           >
             <div className="presModal">
-              <button className="presCloseBtn" onClick={onClose} title="Close">
-                <X className="h-5 w-5" />
-              </button>
-
+              <button className="presCloseBtn" onClick={onClose} title="Close"><X className="h-5 w-5" /></button>
               <div className="presModalHeader">
                 <div className="presModalTitle">Presentation options</div>
                 <div className="presModalSubtitle">Select an existing presentation or create a new one</div>
               </div>
-
               <div className="presModeRow">
                 <button
                   className={cn("presModeBtn", mode === "existing" && "presModeBtnActive")}
@@ -316,41 +315,40 @@ function PresentationDialog({
                   <>
                     <div className="presFieldRow">
                       <div className="presFieldLabel">Select a presentation</div>
-                      <div className="presSelectWrap">
-                        <button
-                          className="presSelectBtn"
-                          onClick={() => setDropdownOpen((v) => !v)}
-                        >
-                          <span>
-                            {selectedPresentation?.name ?? "Select..."}{" "}
-                            {selectedPresentation && <span className="presSelectLang">— {selectedPresentation.lang.toUpperCase()}</span>}
-                          </span>
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        {dropdownOpen && (
-                          <div className="presDropdown">
-                            {MOCK_PRESENTATIONS.map((p) => (
-                              <button
-                                key={p.id}
-                                className={cn("presDropdownItem", p.id === existingId && "presDropdownItemActive")}
-                                onClick={() => {
-                                  setExistingId(p.id);
-                                  setDropdownOpen(false);
-                                }}
-                              >
-                                {p.name}-{p.lang.toUpperCase()}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      {presentations.length === 0 ? (
+                        <div className="text-sm text-gray-400 italic">No presentations available</div>
+                      ) : (
+                        <div className="presSelectWrap">
+                          <button className="presSelectBtn" onClick={() => setDropdownOpen((v) => !v)}>
+                            <span>
+                              {selectedPresentation?.name ?? "Select..."}
+                              {selectedPresentation && (
+                                <span className="presSelectLang"> — {selectedPresentation.language.toUpperCase()}</span>
+                              )}
+                            </span>
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                          {dropdownOpen && (
+                            <div className="presDropdown">
+                              {presentations.map((p) => (
+                                <button
+                                  key={p.name}
+                                  className={cn("presDropdownItem", p.name === existingName && "presDropdownItemActive")}
+                                  onClick={() => { setExistingName(p.name); setDropdownOpen(false); }}
+                                >
+                                  {p.name} — {p.language.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-
                     {selectedPresentation && (
                       <div className="presPreviewCard">
                         <div className="presPreviewTitle">{selectedPresentation.name}</div>
                         <div className="presPreviewDesc">{selectedPresentation.description}</div>
-                        <div className="presPreviewLang">Language: {selectedPresentation.lang.toUpperCase()}</div>
+                        <div className="presPreviewLang">Language: {selectedPresentation.language.toUpperCase()}</div>
                       </div>
                     )}
                   </>
@@ -367,7 +365,6 @@ function PresentationDialog({
                         placeholder="Enter new presentation name"
                       />
                     </div>
-
                     <div className="presFieldRow">
                       <div className="presFieldLabel">Description</div>
                       <input
@@ -377,14 +374,10 @@ function PresentationDialog({
                         placeholder="Enter description"
                       />
                     </div>
-
                     <div className="presFieldRow">
                       <div className="presFieldLabel">Presentation language</div>
                       <div className="presSelectWrap">
-                        <button
-                          className="presSelectBtn"
-                          onClick={() => setLangDropdownOpen((v) => !v)}
-                        >
+                        <button className="presSelectBtn" onClick={() => setLangDropdownOpen((v) => !v)}>
                           <span>{selectedLang?.name ?? "Select language..."}</span>
                           <ChevronDown className="h-4 w-4" />
                         </button>
@@ -394,10 +387,7 @@ function PresentationDialog({
                               <button
                                 key={l.id}
                                 className={cn("presDropdownItem", l.id === lang && "presDropdownItemActive")}
-                                onClick={() => {
-                                  setLang(l.id);
-                                  setLangDropdownOpen(false);
-                                }}
+                                onClick={() => { setLang(l.id); setLangDropdownOpen(false); }}
                               >
                                 {l.name}
                               </button>
@@ -406,22 +396,20 @@ function PresentationDialog({
                         )}
                       </div>
                     </div>
-
                     <div className="presFieldRow">
-                      <div className="presFieldLabel">Upload presentation (PPT/PDF)</div>
+                      <div className="presFieldLabel">Upload presentation (images/PDF)</div>
                       <div className="presFileUpload">
                         <label className="presFileBtn">
                           Choose File
                           <input
                             type="file"
-                            accept=".pdf,.ppt,.pptx"
+                            accept=".pdf,.ppt,.pptx,image/*"
+                            multiple
                             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                             className="presFileInput"
                           />
                         </label>
-                        <span className="presFileName">
-                          {file ? file.name : "No file chosen"}
-                        </span>
+                        <span className="presFileName">{file ? file.name : "No file chosen"}</span>
                       </div>
                     </div>
                   </>
@@ -429,27 +417,24 @@ function PresentationDialog({
               </div>
 
               <div className="presFooter">
-                <button className="presCancelBtn" onClick={onClose}>
-                  Cancel
-                </button>
+                <button className="presCancelBtn" onClick={onClose}>Cancel</button>
                 {mode === "existing" ? (
                   <button
                     className="presSubmitBtn"
-                    onClick={() => {
-                      if (!existingId) return;
-                      onSelect({ mode: "existing", id: existingId });
-                      onClose();
-                    }}
+                    disabled={!existingName}
+                    onClick={() => { if (existingName) { onSelect({ mode: "existing", name: existingName }); onClose(); } }}
                   >
                     Open
                   </button>
                 ) : (
                   <button
                     className="presSubmitBtn"
+                    disabled={!name.trim()}
                     onClick={() => {
-                      if (!name.trim()) return;
-                      onSelect({ mode: "new", name: name.trim(), description: description.trim(), lang, file });
-                      onClose();
+                      if (name.trim()) {
+                        onSelect({ mode: "new", name: name.trim(), description: description.trim(), lang, file });
+                        onClose();
+                      }
                     }}
                   >
                     Create
@@ -464,63 +449,135 @@ function PresentationDialog({
   );
 }
 
-function SlideViewport({ onEnd }: { onEnd: () => void }) {
-  const [page, setPage] = useState(1);
+// ─── SlideViewport ────────────────────────────────────────────────────────────
+function SlideViewport({
+  slides,
+  presentationName,
+  onEnd,
+  onSpeak,
+  onStopSpeaking,
+  onWaitUntilDone,
+}: {
+  slides: SlideData[];
+  presentationName: string;
+  onEnd: () => void;
+  onSpeak: (text: string) => void;
+  onStopSpeaking: () => void;
+  onWaitUntilDone: () => Promise<void>;
+}) {
+  const [page, setPage] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const total = 18;
+  const isPlayingRef = useRef(false);
+  const total = slides.length;
+
+  // Keep ref in sync so the async play loop can read current value
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  // Reset to first slide when presentation changes
+  useEffect(() => {
+    setPage(0);
+    setIsPlaying(false);
+  }, [presentationName]);
+
+  // Speak slide content only when playing and page changes
+  useEffect(() => {
+    if (!isPlaying) return;
+    const slide = slides[page];
+    if (!slide) return;
+    onStopSpeaking();
+    slide.paragraphs.forEach((p) => onSpeak(p));
+  }, [page, slides, isPlaying]);
+
+  // Auto-advance loop when playing
+  useEffect(() => {
+    if (!isPlaying || total === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      await onWaitUntilDone();
+      if (cancelled || !isPlayingRef.current) return;
+      if (page < total - 1) {
+        setPage((p) => p + 1);
+      } else {
+        setIsPlaying(false);
+        onEnd();
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isPlaying, page, total]);
+
+  const slide = slides[page];
+
+  function goTo(idx: number) {
+    onStopSpeaking();
+    setPage(Math.max(0, Math.min(total - 1, idx)));
+  }
 
   return (
     <div className="slideWrap">
       <div className="slideCanvas">
-        <div className="slidePlaceholder">
-          <div className="text-sm text-gray-600">Slide {page} of {total}</div>
-          <div className="text-2xl font-semibold mt-2">Presentation canvas</div>
-          <div className="text-sm text-gray-500 mt-2 max-w-md">
-            Plug your PPT/PDF renderer here.
+        {slide ? (
+          <img
+            src={`/uploads/${encodeURIComponent(presentationName)}/${encodeURIComponent(slide.image)}`}
+            alt={`Slide ${page + 1}`}
+            className="slideImg"
+          />
+        ) : (
+          <div className="slidePlaceholder">
+            <div className="text-sm text-gray-600">No slides loaded</div>
+            <div className="text-2xl font-semibold mt-2">Select a presentation</div>
+            <div className="text-sm text-gray-500 mt-2 max-w-md">
+              Use the Select button or ask the assistant to start a presentation.
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="slideControlsWrapper">
         <div className="slideControlsTop">
-          <button className="slideControlBtn" onClick={() => setPage(1)} title="Go to start">
-            <img src="/start.png" alt="Start" className="slideControlIcon" />
+          <button className="slideControlBtn" onClick={() => goTo(0)} title="Go to start" disabled={total === 0}>
+            <img src="/assets/start.png" alt="Start" className="slideControlIcon" />
           </button>
-
-          <button className="slideControlBtn" onClick={() => setPage((p) => Math.max(1, p - 1))} title="Previous slide">
-            <img src="/left.png" alt="Previous" className="slideControlIconLarge" />
+          <button className="slideControlBtn" onClick={() => goTo(page - 1)} title="Previous slide" disabled={page === 0 || total === 0}>
+            <img src="/assets/left.png" alt="Previous" className="slideControlIconLarge" />
           </button>
 
           <div className="progressBar">
-            <div className="progressFill" style={{ width: `${(page / total) * 100}%` }} />
-            <div className="progressText">{page} of {total}</div>
+            <div className="progressFill" style={{ width: total ? `${((page + 1) / total) * 100}%` : "0%" }} />
+            <div className="progressText">{total ? `${page + 1} of ${total}` : "—"}</div>
           </div>
 
-          <button className="slideControlBtn" onClick={() => setPage((p) => Math.min(total, p + 1))} title="Next slide">
-            <img src="/right.png" alt="Next" className="slideControlIconLarge" />
+          <button className="slideControlBtn" onClick={() => goTo(page + 1)} title="Next slide" disabled={page >= total - 1 || total === 0}>
+            <img src="/assets/right.png" alt="Next" className="slideControlIconLarge" />
           </button>
-
-          <button className="slideControlBtn" onClick={() => setPage(total)} title="Go to end">
-            <img src="/end.png" alt="End" className="slideControlIcon" />
+          <button className="slideControlBtn" onClick={() => goTo(total - 1)} title="Go to end" disabled={total === 0}>
+            <img src="/assets/end.png" alt="End" className="slideControlIcon" />
           </button>
         </div>
 
         <div className="slideControlsBottom">
           <button
             className="slideControlBtn"
+            disabled={total === 0}
             onClick={() => {
               if (isPlaying) {
                 setIsPlaying(false);
+                onStopSpeaking();
               } else {
-                setIsPlaying(true);
-                if (page === total) {
-                  onEnd();
+                if (page >= total - 1) {
+                  setPage(0);
                 }
+                setIsPlaying(true);
               }
             }}
             title={isPlaying ? "Stop" : "Play"}
           >
-            <img src={isPlaying ? "/stop.png" : "/play.png"} alt={isPlaying ? "Stop" : "Play"} className="slideControlIcon" />
+            <img
+              src={isPlaying ? "/assets/stop.png" : "/assets/play.png"}
+              alt={isPlaying ? "Stop" : "Play"}
+              className="slideControlIcon"
+            />
           </button>
         </div>
       </div>
@@ -528,6 +585,7 @@ function SlideViewport({ onEnd }: { onEnd: () => void }) {
   );
 }
 
+// ─── QuizWidget ───────────────────────────────────────────────────────────────
 function QuizWidget() {
   const [ans, setAns] = useState<string | null>(null);
   const correct = "b";
@@ -540,7 +598,6 @@ function QuizWidget() {
         </div>
         <div className="text-xs text-gray-500">1 / 5</div>
       </div>
-
       <div className="quizCard">
         <div className="text-sm font-medium">What should you do before starting a measurement?</div>
         <div className="mt-3 grid gap-2">
@@ -553,11 +610,7 @@ function QuizWidget() {
             const show = ans != null;
             const isCorrect = o.id === correct;
             return (
-              <button
-                key={o.id}
-                onClick={() => setAns(o.id)}
-                className={cn("quizOption", selected && "quizOptionSelected")}
-              >
+              <button key={o.id} onClick={() => setAns(o.id)} className={cn("quizOption", selected && "quizOptionSelected")}>
                 <div className="flex items-center justify-between">
                   <div className="text-sm">{o.label}</div>
                   {show && (isCorrect ? (
@@ -570,14 +623,8 @@ function QuizWidget() {
             );
           })}
         </div>
-
-        {ans && (
-          <div className="mt-3 text-xs text-gray-600">
-            Feedback: Running the safety checklist reduces incidents and ensures correct setup.
-          </div>
-        )}
+        {ans && <div className="mt-3 text-xs text-gray-600">Running the safety checklist reduces incidents and ensures correct setup.</div>}
       </div>
-
       <div className="quizFooter">
         <button className="ghostBtn">Previous</button>
         <button className="blueBtn">Next</button>
@@ -586,29 +633,127 @@ function QuizWidget() {
   );
 }
 
+// ─── ChatPanel ────────────────────────────────────────────────────────────────
 function ChatPanel({
   open,
   onClose,
   panelMode,
+  lang,
+  onSpeak,
+  onStopSpeaking,
+  presentations,
+  presentationContent,
+  onStartPresentation,
+  onContinuePresentation,
+  onSwitchToChat,
 }: {
   open: boolean;
   onClose: () => void;
   panelMode: "discussion" | "quiz";
+  lang: string;
+  onSpeak: (text: string) => void;
+  onStopSpeaking: () => void;
+  presentations: Presentation[];
+  presentationContent: string;
+  onStartPresentation: (name: string) => void;
+  onContinuePresentation: () => void;
+  onSwitchToChat: () => void;
 }) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<any[]>([
-    { role: "assistant", text: "Hello! I’m your assistant. Ask a question anytime." },
-  ]);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; isAction?: boolean }[]>([]);
+  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [isThinking, setIsThinking] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const speech = useSpeechRecognition(lang);
 
-  function send() {
-    const v = input.trim();
-    if (!v) return;
-    setMessages((m) => [...m, { role: "user", text: v }]);
+  // Welcome message resets when language changes
+  useEffect(() => {
+    const welcome = `Hello! I'm your AI assistant. I answer in ${LANG_NAMES[lang] ?? "English"} only. How can I help you?`;
+    const welcomeMsg = { role: "assistant" as const, text: welcome };
+    setMessages([welcomeMsg]);
+    setHistory([{ role: "assistant", text: welcome }]);
+  }, [lang]);
+
+  // Auto-scroll
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isThinking]);
+
+  const send = useCallback(async (text?: string) => {
+    const v = (text ?? input).trim();
+    if (!v || isThinking) return;
     setInput("");
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: "assistant", text: "(demo) Received." }]);
-    }, 250);
-  }
+
+    const userMsg = { role: "user" as const, text: v };
+    setMessages((m) => [...m, userMsg]);
+    setIsThinking(true);
+
+    try {
+      const intent = await classifyIntent(v, presentations);
+
+      if (intent.type === "clear_chat") {
+        const welcome = `Hello! I'm your AI assistant. I answer in ${LANG_NAMES[lang] ?? "English"} only. How can I help you?`;
+        setMessages([{ role: "assistant", text: welcome }]);
+        setHistory([{ role: "assistant", text: welcome }]);
+        setIsThinking(false);
+        return;
+      }
+
+      if (intent.type === "run_presentation" && intent.value) {
+        const match = presentations.find(
+          (p) => p.name.toLowerCase() === intent.value!.toLowerCase()
+        ) ?? presentations.find(
+          (p) => p.name.toLowerCase().includes(intent.value!.toLowerCase())
+        );
+        const name = match?.name ?? intent.value;
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", text: `Starting presentation: "${name}"`, isAction: true },
+        ]);
+        setIsThinking(false);
+        onStartPresentation(name);
+        return;
+      }
+
+      if (intent.type === "continue_presentation") {
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", text: "Resuming presentation...", isAction: true },
+        ]);
+        setIsThinking(false);
+        onContinuePresentation();
+        return;
+      }
+
+      if (intent.type === "change_view_chat") {
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", text: "Switching to chat mode.", isAction: true },
+        ]);
+        setIsThinking(false);
+        onSwitchToChat();
+        return;
+      }
+
+      // answer_question
+      const newHistory: ChatMessage[] = [...history, { role: "user", text: v }];
+      const response = await sendToGemini(v, newHistory, presentations, presentationContent);
+      const botMsg = { role: "assistant" as const, text: response };
+      setMessages((m) => [...m, botMsg]);
+      setHistory([...newHistory, { role: "assistant", text: response }]);
+      onStopSpeaking();
+      onSpeak(response);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "Sorry, I encountered an error. Please try again." },
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
+  }, [input, isThinking, lang, history, presentations, presentationContent, onSpeak, onStopSpeaking, onStartPresentation, onContinuePresentation, onSwitchToChat]);
 
   if (!open) return null;
 
@@ -619,7 +764,6 @@ function ChatPanel({
           <div className="rightTitle">HORIBA Assistant</div>
           <div className="rightSub">{panelMode === "quiz" ? "Quiz" : "Discussion"}</div>
         </div>
-
         <button className="iconBtn" onClick={onClose} title="Close">
           <X className="h-4 w-4" />
         </button>
@@ -630,18 +774,32 @@ function ChatPanel({
           <QuizWidget />
         ) : (
           <>
-            <div className="chatScroll">
+            <div className="chatScroll" ref={scrollRef}>
               {messages.map((m, i) => (
                 <div key={i} className={cn("msgRow", m.role === "user" ? "msgRowUser" : "msgRowAsst")}>
                   <div className="msgMeta">
                     <span className="msgRole">{m.role === "user" ? "YOU" : "ASSISTANT"}</span>
-                    <span className="msgTime">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="msgTime">
+                      {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
-                  <div className={cn("msgBubble", m.role === "user" ? "msgBubbleUser" : "msgBubbleAsst")}>
+                  <div className={cn(
+                    "msgBubble",
+                    m.role === "user" ? "msgBubbleUser" : "msgBubbleAsst",
+                    m.isAction && "msgBubbleAction"
+                  )}>
                     {m.text}
                   </div>
                 </div>
               ))}
+              {isThinking && (
+                <div className="msgRow msgRowAsst">
+                  <div className="msgMeta"><span className="msgRole">ASSISTANT</span></div>
+                  <div className="msgBubble msgBubbleAsst msgBubbleThinking">
+                    <span className="thinkingDot" /><span className="thinkingDot" /><span className="thinkingDot" />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="chatInputRow">
@@ -649,16 +807,33 @@ function ChatPanel({
                 className="chatInput"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => (e.key === "Enter" && input.trim() ? send() : null)}
+                onKeyDown={(e) => { if (e.key === "Enter" && input.trim()) send(); }}
                 placeholder="Type your message..."
+                disabled={isThinking}
               />
               {input.trim() ? (
-                <button className="chatInputIconBtn" onClick={send} title="Send">
-                  <img src="/send.png" alt="Send" className="chatInputIcon" />
+                <button className="chatInputIconBtn" onClick={() => send()} title="Send" disabled={isThinking}>
+                  <img src="/assets/send.png" alt="Send" className="chatInputIcon" />
                 </button>
               ) : (
-                <button className="chatInputIconBtn" title="Voice">
-                  <img src="/microphone.png" alt="Mic" className="chatInputIcon" />
+                <button
+                  className={cn("chatInputIconBtn", speech.isRecording && "chatMicRecording")}
+                  title={speech.supported ? (speech.isRecording ? "Release to send" : "Hold to speak") : "Voice not supported"}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    onStopSpeaking();
+                    speech.start((text) => send(text));
+                  }}
+                  onPointerUp={(e) => { e.preventDefault(); speech.stop(); }}
+                  onPointerLeave={(e) => { e.preventDefault(); if (speech.isRecording) speech.stop(); }}
+                  onPointerCancel={(e) => { e.preventDefault(); if (speech.isRecording) speech.stop(); }}
+                  disabled={!speech.supported}
+                >
+                  {speech.isRecording ? (
+                    <Mic className="chatInputIcon" style={{ color: "#e53e3e" }} />
+                  ) : (
+                    <img src="/assets/microphone.png" alt="Mic" className="chatInputIcon" />
+                  )}
                 </button>
               )}
             </div>
@@ -669,9 +844,9 @@ function ChatPanel({
   );
 }
 
+// ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  // auth session cookie (Google OAuth + Azure AD)
-  const [user, setUser] = useState<null | { name: string; email: string; provider: "google" | "azuread" | "email" }>(null);
+  const [user, setUser] = useState<null | { name: string; email: string; provider: string }>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -687,15 +862,41 @@ export default function App() {
   const mainGridRef = useRef<HTMLElement>(null);
 
   const [presentationDialogOpen, setPresentationDialogOpen] = useState(false);
-  const [activePresentationId, setActivePresentationId] = useState<string | null>(null);
-  const [activePresentationLabel, setActivePresentationLabel] = useState<string>("No presentation selected");
+  const [activePresentationName, setActivePresentationName] = useState<string | null>(null);
+  const [activePresentationLabel, setActivePresentationLabel] = useState("No presentation selected");
+
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [slides, setSlides] = useState<SlideData[]>([]);
+  const [, setIsPlayingPresentation] = useState(false);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const avatarName = useMemo(() => AVATARS.find((a) => a.id === avatar)?.name ?? "Avatar", [avatar]);
+  const avatarRef = useRef<TalkingHeadAvatarHandle>(null);
 
-  // session check
+  // Build presentation text context for Gemini
+  const presentationContent = useMemo(() => {
+    if (!slides.length) return "";
+    return slides
+      .map((s, i) => `[Slide ${i + 1}]\n${s.paragraphs.join("\n")}`)
+      .join("\n\n");
+  }, [slides]);
+
+  // ── Avatar speak helpers ──
+  const handleSpeak = useCallback((text: string) => {
+    avatarRef.current?.speak(text);
+  }, []);
+
+  const handleStopSpeaking = useCallback(() => {
+    avatarRef.current?.stopSpeaking();
+  }, []);
+
+  const handleWaitUntilDone = useCallback(() => {
+    return avatarRef.current?.waitUntilDone() ?? Promise.resolve();
+  }, []);
+
+  // ── Session check ──
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -703,62 +904,92 @@ export default function App() {
         const res = await fetch("/api/auth/me", { credentials: "include" });
         if (cancelled) return;
         if (res.ok) {
-          const data = await res.json();
-          setUser(data);
+          setUser(await res.json());
           setAuthOpen(false);
         } else {
           setUser(null);
           setAuthOpen(true);
         }
       } catch {
-        if (!cancelled) {
-          setUser(null);
-          setAuthOpen(true);
-        }
+        if (!cancelled) { setUser(null); setAuthOpen(true); }
       } finally {
         if (!cancelled) setAuthLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // close menu on outside click
+  // ── Load presentations list ──
+  useEffect(() => {
+    fetch("/api/list-presentations", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: Presentation[]) => { if (Array.isArray(data)) setPresentations(data); })
+      .catch(() => {});
+  }, []);
+
+  // ── Close user menu on outside click ──
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (!userMenuOpen) return;
-      const t = e.target as Node;
-      if (userMenuRef.current && !userMenuRef.current.contains(t)) setUserMenuOpen(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node))
+        setUserMenuOpen(false);
     }
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
   }, [userMenuOpen]);
 
-  // prompt presentation selection automatically in Presentation mode
+  // ── Auto-open presentation dialog when switching to presentation mode ──
   useEffect(() => {
-    if (view === "presentation" && !activePresentationId) setPresentationDialogOpen(true);
-  }, [view, activePresentationId]);
+    if (view === "presentation" && !activePresentationName) setPresentationDialogOpen(true);
+  }, [view, activePresentationName]);
 
-  // Discussion button behavior: open chat panel WITHOUT changing mode (your requirement)
-  function openDiscussion() {
-    setRightOpen(true);
-    setPanelMode("discussion");
-  }
-  function openQuiz() {
-    setRightOpen(true);
-    setPanelMode("quiz");
-  }
-
-  // Change view and open HORIBA Assistant if closed
-  function handleViewChange(newView: "chat" | "presentation") {
-    setView(newView);
-    if (!rightOpen) {
-      setRightOpen(true);
+  // ── Load slide data from API ──
+  async function loadPresentation(name: string) {
+    try {
+      const longLang = LANG_TO_LONG[lang] ?? "english";
+      const res = await fetch(
+        `/api/presentation-data?file_name=${encodeURIComponent(name)}&language=${encodeURIComponent(longLang)}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.error) {
+        console.warn("Presentation data error:", data.error);
+        setSlides([]);
+        return;
+      }
+      const slideArr: SlideData[] = Object.values(data).map((v: any) => ({
+        paragraphs: v[0] as string[],
+        image: v[1] as string,
+      }));
+      setSlides(slideArr);
+      setActivePresentationName(name);
+      setActivePresentationLabel(name);
+      setView("presentation");
+      if (!rightOpen) setRightOpen(true);
+    } catch {
+      setSlides([]);
     }
   }
 
-  // Splitter drag handlers
+  // ── Presentation panel actions ──
+  function openDiscussion() { setRightOpen(true); setPanelMode("discussion"); }
+  function openQuiz()       { setRightOpen(true); setPanelMode("quiz"); }
+
+  function handleViewChange(newView: "chat" | "presentation") {
+    setView(newView);
+    if (!rightOpen) setRightOpen(true);
+  }
+
+  function handleStartPresentation(name: string) {
+    setView("presentation");
+    loadPresentation(name);
+  }
+
+  function handleContinuePresentation() {
+    setIsPlayingPresentation(true);
+  }
+
+  // ── Splitter drag ──
   function handleSplitterMouseDown(e: React.MouseEvent) {
     e.preventDefault();
     isDragging.current = true;
@@ -767,43 +998,39 @@ export default function App() {
   }
 
   useEffect(() => {
-    function handleMouseMove(e: MouseEvent) {
+    function onMove(e: MouseEvent) {
       if (!isDragging.current || !mainGridRef.current) return;
-      const gridRect = mainGridRef.current.getBoundingClientRect();
-      const newWidth = gridRect.right - e.clientX;
-      // Clamp between 300 and half of the screen
-      const maxWidth = gridRect.width / 2;
-      setRightPanelWidth(Math.max(300, Math.min(maxWidth, newWidth)));
+      const rect = mainGridRef.current.getBoundingClientRect();
+      const newW = rect.right - e.clientX;
+      setRightPanelWidth(Math.max(300, Math.min(rect.width / 2, newW)));
     }
-
-    function handleMouseUp() {
+    function onUp() {
       if (isDragging.current) {
         isDragging.current = false;
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
       }
     }
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
     };
   }, []);
 
   return (
     <div className="appRoot">
-      {/* top header */}
+      {/* ── Top header ── */}
       <header className="topBar">
         <div className="topBarInner">
           <div className="brandLeft">
-            <img className="brandHoriba" src="/screen logo Horiba.png" alt="HORIBA" />
+            <img className="brandHoriba" src="/assets/screen logo Horiba.png" alt="HORIBA" />
           </div>
 
           <div className="topControls">
-            <TopSelect imgSrc="/person.png" value={avatar} options={AVATARS} onChange={setAvatar} />
-            <TopSelect imgSrc="/language.png" value={lang} options={LANGS} onChange={setLang} />
+            <TopSelect imgSrc="/assets/person.png" value={avatar} options={AVATARS} onChange={setAvatar} />
+            <TopSelect imgSrc="/assets/language.png" value={lang} options={LANGS} onChange={setLang} />
             <ModeTabs view={view} setView={handleViewChange} />
           </div>
 
@@ -826,19 +1053,14 @@ export default function App() {
                   <div className="text-[13px] text-gray-500">{user?.email ?? "Please sign in"}</div>
                   <div className="text-[14px] font-bold text-gray-400 mt-1">{getUserStatus(user?.email)}</div>
                 </div>
-
                 <div className="userMenuActions">
                   {!user ? (
-                    <button className="blueBtn w-full" onClick={() => setAuthOpen(true)}>
-                      Sign in
-                    </button>
+                    <button className="blueBtn w-full" onClick={() => setAuthOpen(true)}>Sign in</button>
                   ) : (
                     <button
                       className="ghostBtn w-full"
                       onClick={async () => {
-                        try {
-                          await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                        } catch {}
+                        try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
                         setUser(null);
                         setAuthOpen(true);
                         setUserMenuOpen(false);
@@ -854,13 +1076,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* main content */}
+      {/* ── Main grid ── */}
       <main
         ref={mainGridRef}
         className={cn("mainGrid", rightOpen ? "gridWithRight" : "gridNoRight")}
         style={rightOpen ? { gridTemplateColumns: `1fr auto ${rightPanelWidth}px` } : undefined}
       >
-        {/* left area */}
+        {/* Left panel */}
         <Card className="leftCard">
           <div className="leftHeader">
             <div>
@@ -872,9 +1094,7 @@ export default function App() {
 
             {view === "presentation" ? (
               <div className="leftHeaderBtns">
-                <button className="ghostBtn" onClick={() => setPresentationDialogOpen(true)}>
-                  Select...
-                </button>
+                <button className="ghostBtn" onClick={() => setPresentationDialogOpen(true)}>Select...</button>
                 <div className="modeTabs">
                   <button
                     className={cn("modeTab", panelMode === "discussion" && "modeTabActive")}
@@ -893,47 +1113,51 @@ export default function App() {
             ) : (
               !rightOpen && (
                 <div className="leftHeaderBtns">
-                  <button className="ghostBtn" onClick={openDiscussion}>
-                    Chat
-                  </button>
+                  <button className="ghostBtn" onClick={openDiscussion}>Chat</button>
                 </div>
               )
             )}
-
           </div>
 
-          <div className="leftBody">
-            {view === "presentation" ? (
+          <div className="leftBody" style={{ position: "relative" }}>
+            {/* Slides — only visible in presentation view */}
+            {view === "presentation" && (
               <SlideViewport
-                onEnd={() => {
-                  // end of presentation => open quiz in right panel
-                  openQuiz();
-                }}
+                slides={slides}
+                presentationName={activePresentationName ?? ""}
+                onEnd={openQuiz}
+                onSpeak={handleSpeak}
+                onStopSpeaking={handleStopSpeaking}
+                onWaitUntilDone={handleWaitUntilDone}
               />
-            ) : (
-              <div className="avatarStage">
-                {/* Plug your real 3D avatar canvas here */}
-                <div className="avatarPlaceholder">
-                  <div className="text-3xl font-semibold">{avatarName}</div>
-                  <div className="text-sm text-gray-500 mt-2">3D avatar canvas placeholder</div>
-                </div>
-              </div>
             )}
+            {/* Avatar — always mounted; overlay in presentation mode, full-size in chat mode */}
+            <div className={view === "presentation" ? "avatarOverlay" : "avatarStage"}>
+              <TalkingHeadAvatar ref={avatarRef} avatar={avatar} lang={lang} />
+            </div>
           </div>
         </Card>
 
-        {/* splitter */}
+        {/* Splitter */}
         {rightOpen && (
           <div className="splitter" onMouseDown={handleSplitterMouseDown}>
             <div className="splitterLine" />
           </div>
         )}
 
-        {/* right panel */}
+        {/* Right panel */}
         <ChatPanel
           open={rightOpen}
           onClose={() => setRightOpen(false)}
           panelMode={panelMode}
+          lang={lang}
+          onSpeak={handleSpeak}
+          onStopSpeaking={handleStopSpeaking}
+          presentations={presentations}
+          presentationContent={presentationContent}
+          onStartPresentation={handleStartPresentation}
+          onContinuePresentation={handleContinuePresentation}
+          onSwitchToChat={() => handleViewChange("chat")}
         />
       </main>
 
@@ -943,14 +1167,13 @@ export default function App() {
         open={presentationDialogOpen}
         onClose={() => setPresentationDialogOpen(false)}
         defaultLang={lang}
+        presentations={presentations}
         onSelect={(payload) => {
           if (payload.mode === "existing") {
-            const p = MOCK_PRESENTATIONS.find((x) => x.id === payload.id);
-            setActivePresentationId(payload.id);
-            setActivePresentationLabel(p ? `${p.name}` : "Presentation selected");
+            loadPresentation(payload.name);
           } else {
-            const createdId = "new_" + payload.name.toLowerCase().split(" ").join("_");
-            setActivePresentationId(createdId);
+            // New presentation: just set label for now — backend upload not yet wired
+            setActivePresentationName(payload.name);
             setActivePresentationLabel(payload.name);
           }
         }}
@@ -966,8 +1189,6 @@ export default function App() {
               : `/auth/azuread/login?returnTo=${returnTo}`;
         }}
         onEmailContinue={(email) => {
-          // optional magic link endpoint
-          // fetch("/api/auth/email/start", {method:"POST", credentials:"include", headers:{'Content-Type':'application/json'}, body: JSON.stringify({email})})
           console.log("email auth start", email);
         }}
       />

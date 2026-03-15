@@ -4,6 +4,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
 import { Issuer } from "openid-client";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, "../frontend/public/uploads");
 
 const PORT = process.env.PORT || 3001;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -82,6 +89,43 @@ app.use(
 );
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// Serve slide images from uploads folder
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// GET /api/list-presentations
+app.get("/api/list-presentations", (req, res) => {
+  const filePath = path.join(UPLOADS_DIR, "files.json");
+  try {
+    if (!fs.existsSync(filePath)) return res.json([]);
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    res.json(parsed.files || []);
+  } catch {
+    res.json([]);
+  }
+});
+
+// GET /api/presentation-data?file_name=...&language=...
+app.get("/api/presentation-data", (req, res) => {
+  const { file_name, language } = req.query;
+  if (!file_name) return res.status(400).json({ error: "Missing file_name" });
+  const safeName = path.basename(String(file_name));
+  const filePath = path.join(UPLOADS_DIR, safeName, `content_${language}.txt`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(500).json({ error: `Could not file content in ${language}` });
+  }
+  const data = fs.readFileSync(filePath, "utf-8");
+  const blocks = data.split("-------").map(b => b.trim()).filter(Boolean);
+  const result = {};
+  blocks.forEach((block, index) => {
+    const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    const paragraphs = lines.filter(l => !l.startsWith("image:"));
+    const imageLine = lines.find(l => l.startsWith("image:")) || "";
+    const image = imageLine.replace("image:", "").trim();
+    result[(index + 1).toString()] = [paragraphs, image];
+  });
+  res.json(result);
+});
 
 // Who am I?
 app.get("/api/auth/me", (req, res) => {
