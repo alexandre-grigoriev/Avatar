@@ -63,3 +63,4 @@ image:Diapositive8.bmp
 Thank you for your attention and I remain at your disposal for any questions
 image:Diapositive9.bmp
 -------
+quiz:YES

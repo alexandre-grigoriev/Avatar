@@ -116,15 +116,20 @@ app.get("/api/presentation-data", (req, res) => {
   }
   const data = fs.readFileSync(filePath, "utf-8");
   const blocks = data.split("-------").map(b => b.trim()).filter(Boolean);
+  let quizEnabled = true;
   const result = {};
-  blocks.forEach((block, index) => {
+  let slideIndex = 0;
+  blocks.forEach((block) => {
+    const quizMatch = block.match(/^quiz:(YES|NO)$/i);
+    if (quizMatch) { quizEnabled = quizMatch[1].toUpperCase() === "YES"; return; }
+    slideIndex++;
     const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
     const paragraphs = lines.filter(l => !l.startsWith("image:"));
     const imageLine = lines.find(l => l.startsWith("image:")) || "";
     const image = imageLine.replace("image:", "").trim();
-    result[(index + 1).toString()] = [paragraphs, image];
+    result[slideIndex.toString()] = [paragraphs, image];
   });
-  res.json(result);
+  res.json({ slides: result, quizEnabled });
 });
 
 // Who am I?

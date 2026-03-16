@@ -74,6 +74,87 @@ User message: ${message}`;
   return { type: "answer_question" };
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: { id: string; label: string }[];
+  correct: string[];          // always an array; single-choice has one element
+  explanation: string;
+  type: "single" | "multiple";
+}
+
+/** Generate quiz questions from presentation content */
+export async function generateQuizQuestions(
+  content: string,
+  lang: string,
+  count = 5
+): Promise<QuizQuestion[]> {
+  const langName = { en: "English", fr: "French", ar: "Arabic" }[lang] ?? "English";
+  const prompt = `You are a quiz generator. Based on the following presentation content, generate exactly ${count} multiple-choice questions in ${langName}.
+
+Presentation content:
+${content}
+
+Rules:
+- Each question must have exactly 3 options labeled "a", "b", "c"
+- Only one option is correct
+- Provide a short explanation for the correct answer
+- Write everything in ${langName}
+- Reply ONLY with valid JSON array, no markdown, no extra text
+
+Format:
+[{"question":"...","options":[{"id":"a","label":"..."},{"id":"b","label":"..."},{"id":"c","label":"..."}],"correct":"a","explanation":"..."}]`;
+
+  try {
+    const text = await callGemini(prompt);
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      // Normalize: correct may be string from Gemini, wrap in array
+      const parsed = JSON.parse(match[0]) as Array<Omit<QuizQuestion, "correct" | "type"> & { correct: string | string[] }>;
+      return parsed.map((q) => ({
+        ...q,
+        correct: Array.isArray(q.correct) ? q.correct : [q.correct],
+        type: "single" as const,
+      }));
+    }
+  } catch {
+    // fall through
+  }
+  return [];
+}
+
+/** Translate quiz questions to a target language */
+export async function translateQuizQuestions(
+  questions: QuizQuestion[],
+  lang: string
+): Promise<QuizQuestion[]> {
+  const langName = { en: "English", fr: "French", ar: "Arabic" }[lang] ?? "English";
+
+  // Only send translatable text; keep structural fields (correct, type, ids) intact
+  const texts = questions.map((q) => ({
+    q: q.question,
+    o: q.options.map((opt) => opt.label),
+    e: q.explanation,
+  }));
+
+  const prompt = `Translate to ${langName}. Reply ONLY with a JSON array, no markdown, no extra text. Keep the exact same structure with fields "q", "o" (array), "e".\n\n${JSON.stringify(texts)}`;
+  try {
+    const text = await callGemini(prompt);
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      const translated: Array<{ q: string; o: string[]; e: string }> = JSON.parse(match[0]);
+      return questions.map((q, i) => ({
+        ...q,
+        question: translated[i]?.q ?? q.question,
+        options: q.options.map((opt, j) => ({ ...opt, label: translated[i]?.o[j] ?? opt.label })),
+        explanation: translated[i]?.e ?? q.explanation,
+      }));
+    }
+  } catch {
+    // fall through — return originals
+  }
+  return questions;
+}
+
 /** Send a message to Gemini and return the AI response */
 export async function sendToGemini(
   message: string,

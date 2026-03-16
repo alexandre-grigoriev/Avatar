@@ -303,6 +303,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   padding-left: 168px; /* reserve space for the avatar overlay (160px + 8px gap) */
   overflow: hidden;
 }
+.slideCanvasExpanded{ padding-left: 0; }
 .slidePlaceholder{ text-align:center; color:#111827; padding: 20px; }
 .slideControlsWrapper{
   display: flex;
@@ -395,13 +396,13 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 .avatarOverlay{
   position: absolute;
   top: 10px;
-  left: 10px;
-  width: 160px;
+  left: 15px;
+  width: 170px;
   height: 220px;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-  z-index: 10;
+  z-index: 30;
 }
 .avatarPlaceholder{ text-align:center; color:#111827; }
 

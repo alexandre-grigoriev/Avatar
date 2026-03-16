@@ -57,3 +57,4 @@ image:Diapositive8.bmp
 Je vous remercie pour votre attention et je reste à votre disposition pour toute question
 image:Diapositive9.bmp
 -------
+quiz:NO

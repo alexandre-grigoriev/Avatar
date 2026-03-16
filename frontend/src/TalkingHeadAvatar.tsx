@@ -54,6 +54,7 @@ export interface TalkingHeadAvatarHandle {
   speak: (text: string) => void;
   stopSpeaking: () => void;
   waitUntilDone: () => Promise<void>;
+  setView: (view: "full" | "upper" | "mid" | "head") => void;
 }
 
 interface Props {
@@ -73,6 +74,9 @@ const TalkingHeadAvatar = forwardRef<TalkingHeadAvatarHandle, Props>(function Ta
     },
     stopSpeaking() {
       headRef.current?.stopSpeaking?.();
+    },
+    setView(view: "full" | "upper" | "mid" | "head") {
+      headRef.current?.setView(view);
     },
     waitUntilDone() {
       // Only resolves when head is loaded AND has finished speaking.

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import TalkingHeadAvatar, { type TalkingHeadAvatarHandle } from "./TalkingHeadAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,8 +17,11 @@ import "./App.css";
 import {
   sendToGemini,
   classifyIntent,
+  generateQuizQuestions,
+  translateQuizQuestions,
   type ChatMessage,
   type Presentation,
+  type QuizQuestion,
 } from "./services/gemini";
 import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 
@@ -40,8 +43,39 @@ const LANGS = [
   { id: "ar", name: "Arabic" },
 ];
 
-const LANG_NAMES: Record<string, string> = { en: "English", fr: "French", ar: "Arabic" };
 const LANG_TO_LONG: Record<string, string> = { en: "english", fr: "french", ar: "arabic" };
+const LONG_TO_LANG: Record<string, string> = { english: "en", french: "fr", arabic: "ar" };
+
+const UI_STRINGS: Record<string, {
+  welcome: string;
+  startPresentation: (name: string) => string;
+  resuming: string;
+  switchingChat: string;
+  error: string;
+}> = {
+  en: {
+    welcome: "Hello! I'm your HORIBA assistant. How can I help you?",
+    startPresentation: (name) => `Starting presentation: "${name}"`,
+    resuming: "Resuming presentation...",
+    switchingChat: "Switching to chat mode.",
+    error: "Sorry, I encountered an error. Please try again.",
+  },
+  fr: {
+    welcome: "Bonjour\u00a0! Je suis votre assistant HORIBA. Comment puis-je vous aider\u00a0?",
+    startPresentation: (name) => `Démarrage de la présentation\u00a0: «\u00a0${name}\u00a0»`,
+    resuming: "Reprise de la présentation...",
+    switchingChat: "Passage en mode discussion.",
+    error: "Désolé, une erreur s'est produite. Veuillez réessayer.",
+  },
+  ar: {
+    welcome: "مرحباً! أنا مساعدك في HORIBA. كيف يمكنني مساعدتك؟",
+    startPresentation: (name) => `بدء العرض التقديمي: "${name}"`,
+    resuming: "استئناف العرض التقديمي...",
+    switchingChat: "التبديل إلى وضع المحادثة.",
+    error: "عذراً، حدث خطأ. يرجى المحاولة مرة أخرى.",
+  },
+};
+const t = (lang: string) => UI_STRINGS[lang] ?? UI_STRINGS.en;
 
 const ADMIN_EMAILS = ["alexandre.grigoriev@gmail.com", "alexandre.grigoriev@horiba.com"];
 const TRUSTED_USERS: string[] = [];
@@ -152,9 +186,11 @@ function ModeTabs({
   );
 }
 
-function Card({ children, className }: any) {
-  return <div className={cn("cardLite", className)}>{children}</div>;
-}
+const Card = React.forwardRef<HTMLDivElement, { children: React.ReactNode; className?: string }>(
+  function Card({ children, className }, ref) {
+    return <div ref={ref} className={cn("cardLite", className)}>{children}</div>;
+  }
+);
 
 // ─── AuthDialog ───────────────────────────────────────────────────────────────
 function AuthDialog({
@@ -457,6 +493,8 @@ function SlideViewport({
   onSpeak,
   onStopSpeaking,
   onWaitUntilDone,
+  onPlayingChange,
+  avatarHidden,
 }: {
   slides: SlideData[];
   presentationName: string;
@@ -464,6 +502,8 @@ function SlideViewport({
   onSpeak: (text: string) => void;
   onStopSpeaking: () => void;
   onWaitUntilDone: () => Promise<void>;
+  onPlayingChange?: (playing: boolean, reason: "manual" | "end") => void;
+  avatarHidden?: boolean;
 }) {
   const [page, setPage] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -473,10 +513,15 @@ function SlideViewport({
   // Keep ref in sync so the async play loop can read current value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
+  function changePlayState(value: boolean, reason: "manual" | "end" = "manual") {
+    setIsPlaying(value);
+    onPlayingChange?.(value, reason);
+  }
+
   // Reset to first slide when presentation changes
   useEffect(() => {
     setPage(0);
-    setIsPlaying(false);
+    changePlayState(false, "manual");
   }, [presentationName]);
 
   // Speak slide content only when playing and page changes
@@ -499,7 +544,7 @@ function SlideViewport({
       if (page < total - 1) {
         setPage((p) => p + 1);
       } else {
-        setIsPlaying(false);
+        changePlayState(false, "end");
         onEnd();
       }
     })();
@@ -516,7 +561,7 @@ function SlideViewport({
 
   return (
     <div className="slideWrap">
-      <div className="slideCanvas">
+      <div className={`slideCanvas${avatarHidden ? " slideCanvasExpanded" : ""}`}>
         {slide ? (
           <img
             src={`/uploads/${encodeURIComponent(presentationName)}/${encodeURIComponent(slide.image)}`}
@@ -562,13 +607,13 @@ function SlideViewport({
             disabled={total === 0}
             onClick={() => {
               if (isPlaying) {
-                setIsPlaying(false);
+                changePlayState(false, "manual");
                 onStopSpeaking();
               } else {
                 if (page >= total - 1) {
                   setPage(0);
                 }
-                setIsPlaying(true);
+                changePlayState(true);
               }
             }}
             title={isPlaying ? "Stop" : "Play"}
@@ -586,34 +631,164 @@ function SlideViewport({
 }
 
 // ─── QuizWidget ───────────────────────────────────────────────────────────────
-function QuizWidget() {
-  const [ans, setAns] = useState<string | null>(null);
-  const correct = "b";
+function convertJsonQuestions(raw: Array<{ question: string; type: string; choices: string[]; correctAnswers: number[] }>): QuizQuestion[] {
+  return raw.map((q) => {
+    const options = q.choices.map((label, i) => ({ id: String.fromCharCode(97 + i), label }));
+    const correct = q.correctAnswers.map((i) => options[i].id);
+    return { question: q.question, options, correct, explanation: "", type: q.type === "multiple" ? "multiple" : "single" };
+  });
+}
+
+function QuizWidget({
+  presentationContent, presentationName, lang, userName,
+}: {
+  presentationContent: string;
+  presentationName: string;
+  lang: string;
+  userName?: string;
+}) {
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string[]>>({});
+  const [validated, setValidated] = useState<Record<number, boolean>>({});
+  const [sendTo, setSendTo] = useState("alexandre.grigoriev@horiba.com");
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (!presentationContent && !presentationName) return;
+    setLoading(true);
+    setIdx(0);
+    setAnswers({});
+    setValidated({});
+    setSubmitted(false);
+    (async () => {
+      try {
+        if (presentationName) {
+          const langFile = LANG_TO_LONG[lang] ?? lang; // e.g. "french"
+          const base = `/uploads/${encodeURIComponent(presentationName)}`;
+
+          // 1. Try language-specific file (question_french.json etc.) — no translation needed
+          const res1 = await fetch(`${base}/question_${langFile}.json`);
+          if (res1.ok) {
+            const data = await res1.json();
+            if (Array.isArray(data.questions) && data.questions.length > 0) {
+              if (data.sendto) setSendTo(data.sendto);
+              setQuestions(convertJsonQuestions(data.questions));
+              return;
+            }
+          }
+
+          // 2. Try default question.json and translate if needed
+          const res2 = await fetch(`${base}/question.json`);
+          if (res2.ok) {
+            const data = await res2.json();
+            if (Array.isArray(data.questions) && data.questions.length > 0) {
+              if (data.sendto) setSendTo(data.sendto);
+              let qs = convertJsonQuestions(data.questions);
+              if (lang !== "en") qs = await translateQuizQuestions(qs, lang);
+              setQuestions(qs);
+              return;
+            }
+          }
+        }
+
+        // 3. Fall back to Gemini generation from presentation content
+        if (presentationContent) {
+          const qs = await generateQuizQuestions(presentationContent, lang);
+          setQuestions(qs);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [presentationContent, presentationName, lang]);
+
+  const toggleAnswer = (qIdx: number, optId: string, multiple: boolean) => {
+    setAnswers((prev) => {
+      const cur = prev[qIdx] ?? [];
+      if (multiple) {
+        return { ...prev, [qIdx]: cur.includes(optId) ? cur.filter((id) => id !== optId) : [...cur, optId] };
+      }
+      return { ...prev, [qIdx]: [optId] };
+    });
+  };
+
+  const handleSubmit = () => {
+    let score = 0;
+    const lines: string[] = [
+      `Quiz Results — ${presentationName}`,
+      `Date: ${new Date().toLocaleString()}`,
+      ...(userName ? [`User: ${userName}`] : []),
+      "",
+    ];
+    questions.forEach((q, i) => {
+      const selected = answers[i] ?? [];
+      const isCorrect = q.correct.length === selected.length && q.correct.every((c) => selected.includes(c));
+      if (isCorrect) score++;
+      const selLabels = selected.map((id) => q.options.find((o) => o.id === id)?.label ?? id).join(", ");
+      const corLabels = q.correct.map((id) => q.options.find((o) => o.id === id)?.label ?? id).join(", ");
+      lines.push(`Q${i + 1}: ${q.question}`, `  Answer: ${selLabels || "(none)"}`, `  Correct: ${corLabels} ${isCorrect ? "✓" : "✗"}`, "");
+    });
+    lines.push(`Score: ${score} / ${questions.length}`);
+
+    const to = sendTo || "alexandre.grigoriev@horiba.com";
+    const subject = encodeURIComponent(`Quiz Results — ${presentationName}`);
+    const body = encodeURIComponent(lines.join("\n"));
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");
+    setSubmitted(true);
+  };
+
+  if (loading) return (
+    <div className="quizWrap" style={{ alignItems: "center", justifyContent: "center", display: "flex", flex: 1 }}>
+      <div className="avatarSpinner" />
+    </div>
+  );
+
+  if (submitted) return (
+    <div className="quizWrap" style={{ alignItems: "center", justifyContent: "center", display: "flex", flex: 1 }}>
+      <div style={{ color: "#111827", fontSize: 14, textAlign: "center", padding: "0 24px", lineHeight: 1.6 }}>
+        <CheckCircle2 className="h-8 w-8 text-green-600" style={{ margin: "0 auto 12px" }} />
+        Results sent! Thank you for completing the quiz.
+      </div>
+    </div>
+  );
+
+  if (!questions.length) return (
+    <div className="quizWrap" style={{ alignItems: "center", justifyContent: "center", display: "flex", flex: 1 }}>
+      <div style={{ color: "#6b7280", fontSize: 14, textAlign: "center", padding: "0 16px" }}>
+        No quiz available. Complete a presentation first.
+      </div>
+    </div>
+  );
+
+  const q = questions[idx];
+  const isLast = idx === questions.length - 1;
+  const isMultiple = q.type === "multiple";
+  const selectedIds = answers[idx] ?? [];
+  const isValidated = isMultiple ? !!validated[idx] : selectedIds.length > 0;
+  const showResult = isValidated;
+
   return (
     <div className="quizWrap">
       <div className="quizHeader">
-        <div>
-          <div className="font-semibold">Quiz</div>
-          <div className="text-xs text-gray-500">After presentation end</div>
-        </div>
-        <div className="text-xs text-gray-500">1 / 5</div>
+        <div className="font-semibold">Quiz</div>
+        <div className="text-xs text-gray-500">{idx + 1} / {questions.length}</div>
       </div>
       <div className="quizCard">
-        <div className="text-sm font-medium">What should you do before starting a measurement?</div>
+        <div className="text-sm font-medium">{q.question}</div>
+        {isMultiple && <div className="text-xs text-gray-400 mt-1">Select all that apply</div>}
         <div className="mt-3 grid gap-2">
-          {[
-            { id: "a", label: "Skip the checklist" },
-            { id: "b", label: "Run the safety checklist" },
-            { id: "c", label: "Disable alarms" },
-          ].map((o) => {
-            const selected = ans === o.id;
-            const show = ans != null;
-            const isCorrect = o.id === correct;
+          {q.options.map((o) => {
+            const selected = selectedIds.includes(o.id);
+            const isCorrect = q.correct.includes(o.id);
             return (
-              <button key={o.id} onClick={() => setAns(o.id)} className={cn("quizOption", selected && "quizOptionSelected")}>
+              <button key={o.id} onClick={() => !isValidated && toggleAnswer(idx, o.id, isMultiple)} className={cn("quizOption", selected && "quizOptionSelected")} style={isValidated ? { cursor: "default" } : undefined}>
                 <div className="flex items-center justify-between">
                   <div className="text-sm">{o.label}</div>
-                  {show && (isCorrect ? (
+                  {showResult && (isCorrect ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : selected ? (
                     <XCircle className="h-4 w-4 text-red-600" />
@@ -623,11 +798,16 @@ function QuizWidget() {
             );
           })}
         </div>
-        {ans && <div className="mt-3 text-xs text-gray-600">Running the safety checklist reduces incidents and ensures correct setup.</div>}
+        {showResult && q.explanation && <div className="mt-3 text-xs text-gray-600">{q.explanation}</div>}
       </div>
       <div className="quizFooter">
-        <button className="ghostBtn">Previous</button>
-        <button className="blueBtn">Next</button>
+        <button className="ghostBtn" disabled={idx === 0} onClick={() => setIdx((i) => i - 1)}>Previous</button>
+        {isMultiple && !isValidated
+          ? <button className="blueBtn" disabled={selectedIds.length === 0} onClick={() => setValidated((v) => ({ ...v, [idx]: true }))}>Validate</button>
+          : isLast
+            ? <button className="blueBtn" onClick={handleSubmit}>Submit</button>
+            : <button className="blueBtn" onClick={() => setIdx((i) => i + 1)}>Next</button>
+        }
       </div>
     </div>
   );
@@ -643,6 +823,8 @@ function ChatPanel({
   onStopSpeaking,
   presentations,
   presentationContent,
+  presentationName,
+  userName,
   onStartPresentation,
   onContinuePresentation,
   onSwitchToChat,
@@ -655,6 +837,8 @@ function ChatPanel({
   onStopSpeaking: () => void;
   presentations: Presentation[];
   presentationContent: string;
+  presentationName: string;
+  userName?: string;
   onStartPresentation: (name: string) => void;
   onContinuePresentation: () => void;
   onSwitchToChat: () => void;
@@ -668,7 +852,7 @@ function ChatPanel({
 
   // Welcome message resets when language changes
   useEffect(() => {
-    const welcome = `Hello! I'm your AI assistant. I answer in ${LANG_NAMES[lang] ?? "English"} only. How can I help you?`;
+    const welcome = t(lang).welcome;
     const welcomeMsg = { role: "assistant" as const, text: welcome };
     setMessages([welcomeMsg]);
     setHistory([{ role: "assistant", text: welcome }]);
@@ -694,7 +878,7 @@ function ChatPanel({
       const intent = await classifyIntent(v, presentations);
 
       if (intent.type === "clear_chat") {
-        const welcome = `Hello! I'm your AI assistant. I answer in ${LANG_NAMES[lang] ?? "English"} only. How can I help you?`;
+        const welcome = t(lang).welcome;
         setMessages([{ role: "assistant", text: welcome }]);
         setHistory([{ role: "assistant", text: welcome }]);
         setIsThinking(false);
@@ -710,7 +894,7 @@ function ChatPanel({
         const name = match?.name ?? intent.value;
         setMessages((m) => [
           ...m,
-          { role: "assistant", text: `Starting presentation: "${name}"`, isAction: true },
+          { role: "assistant", text: t(lang).startPresentation(name), isAction: true },
         ]);
         setIsThinking(false);
         onStartPresentation(name);
@@ -720,7 +904,7 @@ function ChatPanel({
       if (intent.type === "continue_presentation") {
         setMessages((m) => [
           ...m,
-          { role: "assistant", text: "Resuming presentation...", isAction: true },
+          { role: "assistant", text: t(lang).resuming, isAction: true },
         ]);
         setIsThinking(false);
         onContinuePresentation();
@@ -730,7 +914,7 @@ function ChatPanel({
       if (intent.type === "change_view_chat") {
         setMessages((m) => [
           ...m,
-          { role: "assistant", text: "Switching to chat mode.", isAction: true },
+          { role: "assistant", text: t(lang).switchingChat, isAction: true },
         ]);
         setIsThinking(false);
         onSwitchToChat();
@@ -748,7 +932,7 @@ function ChatPanel({
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: "Sorry, I encountered an error. Please try again." },
+        { role: "assistant", text: t(lang).error },
       ]);
     } finally {
       setIsThinking(false);
@@ -771,7 +955,7 @@ function ChatPanel({
 
       <div className="rightBody">
         {panelMode === "quiz" ? (
-          <QuizWidget />
+          <QuizWidget presentationContent={presentationContent} presentationName={presentationName} lang={lang} userName={userName} />
         ) : (
           <>
             <div className="chatScroll" ref={scrollRef}>
@@ -856,6 +1040,7 @@ export default function App() {
 
   const [rightOpen, setRightOpen] = useState(true);
   const [panelMode, setPanelMode] = useState<"discussion" | "quiz">("discussion");
+  const [quizEnabled, setQuizEnabled] = useState(true);
 
   const [rightPanelWidth, setRightPanelWidth] = useState(420);
   const isDragging = useRef(false);
@@ -867,13 +1052,14 @@ export default function App() {
 
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [slides, setSlides] = useState<SlideData[]>([]);
-  const [, setIsPlayingPresentation] = useState(false);
+  const [isPresentationPlaying, setIsPresentationPlaying] = useState(false);
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const avatarName = useMemo(() => AVATARS.find((a) => a.id === avatar)?.name ?? "Avatar", [avatar]);
   const avatarRef = useRef<TalkingHeadAvatarHandle>(null);
+  const leftCardRef = useRef<HTMLDivElement>(null);
 
   // Build presentation text context for Gemini
   const presentationContent = useMemo(() => {
@@ -894,6 +1080,48 @@ export default function App() {
 
   const handleWaitUntilDone = useCallback(() => {
     return avatarRef.current?.waitUntilDone() ?? Promise.resolve();
+  }, []);
+
+  const [avatarPlayingStyle, setAvatarPlayingStyle] = useState<React.CSSProperties>({});
+
+  useLayoutEffect(() => {
+    if (!isPresentationPlaying || view !== "presentation") {
+      setAvatarPlayingStyle({});
+      return;
+    }
+    const update = () => {
+      if (!leftCardRef.current) return;
+      const card = leftCardRef.current.getBoundingClientRect();
+      setAvatarPlayingStyle({
+        position: "fixed",
+        top: card.top + 10,
+        left: card.right - 180,
+        width: 170,
+        height: 220,
+        zIndex: 30,
+        overflow: "hidden",
+        borderRadius: "12px",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [isPresentationPlaying, view]);
+
+  const handlePlayingChange = useCallback((playing: boolean, reason: "manual" | "end") => {
+    setIsPresentationPlaying(playing);
+    if (playing) {
+      setRightOpen(false);
+    } else {
+      if (reason === "end") {
+        setRightOpen(true);
+        setPanelMode(quizEnabled ? "quiz" : "discussion");
+      } else {
+        setRightOpen(true);
+        setPanelMode("discussion");
+      }
+    }
   }, []);
 
   // ── Session check ──
@@ -944,9 +1172,9 @@ export default function App() {
   }, [view, activePresentationName]);
 
   // ── Load slide data from API ──
-  async function loadPresentation(name: string) {
+  async function loadPresentation(name: string, langOverride?: string) {
     try {
-      const longLang = LANG_TO_LONG[lang] ?? "english";
+      const longLang = LANG_TO_LONG[langOverride ?? lang] ?? "english";
       const res = await fetch(
         `/api/presentation-data?file_name=${encodeURIComponent(name)}&language=${encodeURIComponent(longLang)}`,
         { credentials: "include" }
@@ -957,7 +1185,20 @@ export default function App() {
         setSlides([]);
         return;
       }
-      const slideArr: SlideData[] = Object.values(data).map((v: any) => ({
+      // New backend returns { slides, quizEnabled }; old backend returns flat slide map
+      const rawSlides: Record<string, any> = data.slides ?? data;
+      // Detect quiz flag — either from new backend field OR from a standalone "quiz:..." slide block
+      let qEnabled = data.quizEnabled !== false;
+      const slideEntries = Object.entries(rawSlides).filter(([, v]: [string, any]) => {
+        if (Array.isArray(v) && v[0]?.length === 1 && /^quiz:(YES|NO)$/i.test(v[0][0])) {
+          qEnabled = /^quiz:YES$/i.test(v[0][0]);
+          return false; // exclude this pseudo-slide
+        }
+        return true;
+      });
+      setQuizEnabled(qEnabled);
+      if (!qEnabled && panelMode === "quiz") setPanelMode("discussion");
+      const slideArr: SlideData[] = slideEntries.map(([, v]: [string, any]) => ({
         paragraphs: v[0] as string[],
         image: v[1] as string,
       }));
@@ -975,18 +1216,44 @@ export default function App() {
   function openDiscussion() { setRightOpen(true); setPanelMode("discussion"); }
   function openQuiz()       { setRightOpen(true); setPanelMode("quiz"); }
 
+  async function handleLangChange(newLang: string) {
+    if (view !== "presentation" || !activePresentationName) {
+      setLang(newLang);
+      return;
+    }
+    // Presentation mode: verify content file exists for the requested language
+    const longLang = LANG_TO_LONG[newLang] ?? newLang;
+    try {
+      const res = await fetch(
+        `/uploads/${encodeURIComponent(activePresentationName)}/content_${longLang}.txt`,
+        { method: "HEAD" }
+      );
+      if (res.ok) {
+        setLang(newLang);
+        loadPresentation(activePresentationName, newLang);
+      }
+      // else: silently stay on current language — TopSelect value={lang} auto-reverts
+    } catch {
+      // network error: stay on current language
+    }
+  }
+
   function handleViewChange(newView: "chat" | "presentation") {
     setView(newView);
     if (!rightOpen) setRightOpen(true);
   }
 
   function handleStartPresentation(name: string) {
+    setActivePresentationName(name);
     setView("presentation");
-    loadPresentation(name);
+    // Auto-set language to match the presentation's primary language
+    const presLang = LONG_TO_LANG[presentations.find((p) => p.name === name)?.language ?? ""] ?? lang;
+    if (presLang !== lang) setLang(presLang);
+    loadPresentation(name, presLang);
   }
 
   function handleContinuePresentation() {
-    setIsPlayingPresentation(true);
+    handlePlayingChange(true, "manual");
   }
 
   // ── Splitter drag ──
@@ -1030,7 +1297,7 @@ export default function App() {
 
           <div className="topControls">
             <TopSelect imgSrc="/assets/person.png" value={avatar} options={AVATARS} onChange={setAvatar} />
-            <TopSelect imgSrc="/assets/language.png" value={lang} options={LANGS} onChange={setLang} />
+            <TopSelect imgSrc="/assets/language.png" value={lang} options={LANGS} onChange={handleLangChange} />
             <ModeTabs view={view} setView={handleViewChange} />
           </div>
 
@@ -1083,41 +1350,43 @@ export default function App() {
         style={rightOpen ? { gridTemplateColumns: `1fr auto ${rightPanelWidth}px` } : undefined}
       >
         {/* Left panel */}
-        <Card className="leftCard">
-          <div className="leftHeader">
-            <div>
-              <div className="leftTitle">{view === "presentation" ? "Presentation" : "Avatar"}</div>
-              <div className="leftSub">
-                {view === "presentation" ? activePresentationLabel : `Person: ${avatarName}`}
-              </div>
-            </div>
-
-            {view === "presentation" ? (
-              <div className="leftHeaderBtns">
-                <button className="ghostBtn" onClick={() => setPresentationDialogOpen(true)}>Select...</button>
-                <div className="modeTabs">
-                  <button
-                    className={cn("modeTab", panelMode === "discussion" && "modeTabActive")}
-                    onClick={openDiscussion}
-                  >
-                    Discussion
-                  </button>
-                  <button
-                    className={cn("modeTab", panelMode === "quiz" && "modeTabActive")}
-                    onClick={openQuiz}
-                  >
-                    Quiz
-                  </button>
+        <Card className="leftCard" ref={leftCardRef}>
+          {!isPresentationPlaying && (
+            <div className="leftHeader">
+              <div>
+                <div className="leftTitle">{view === "presentation" ? "Presentation" : "Avatar"}</div>
+                <div className="leftSub">
+                  {view === "presentation" ? activePresentationLabel : `Person: ${avatarName}`}
                 </div>
               </div>
-            ) : (
-              !rightOpen && (
+
+              {view === "presentation" ? (
+                <div className="leftHeaderBtns">
+                  <button className="ghostBtn" onClick={() => setPresentationDialogOpen(true)}>Select...</button>
+                  <div className="modeTabs">
+                    <button
+                      className={cn("modeTab", panelMode === "discussion" && "modeTabActive")}
+                      onClick={openDiscussion}
+                    >
+                      Discussion
+                    </button>
+                    <button
+                      className={cn("modeTab", panelMode === "quiz" && "modeTabActive")}
+                      onClick={openQuiz}
+                      disabled={!quizEnabled}
+                      style={!quizEnabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+                    >
+                      Quiz
+                    </button>
+                  </div>
+                </div>
+              ) : view === "chat" && !rightOpen ? (
                 <div className="leftHeaderBtns">
                   <button className="ghostBtn" onClick={openDiscussion}>Chat</button>
                 </div>
-              )
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="leftBody" style={{ position: "relative" }}>
             {/* Slides — only visible in presentation view */}
@@ -1125,14 +1394,19 @@ export default function App() {
               <SlideViewport
                 slides={slides}
                 presentationName={activePresentationName ?? ""}
-                onEnd={openQuiz}
+                onEnd={quizEnabled ? openQuiz : openDiscussion}
                 onSpeak={handleSpeak}
                 onStopSpeaking={handleStopSpeaking}
                 onWaitUntilDone={handleWaitUntilDone}
+                onPlayingChange={handlePlayingChange}
+                avatarHidden={isPresentationPlaying}
               />
             )}
             {/* Avatar — always mounted; overlay in presentation mode, full-size in chat mode */}
-            <div className={view === "presentation" ? "avatarOverlay" : "avatarStage"}>
+            <div
+              className={view === "presentation" && !isPresentationPlaying ? "avatarOverlay" : view === "chat" ? "avatarStage" : undefined}
+              style={isPresentationPlaying ? avatarPlayingStyle : undefined}
+            >
               <TalkingHeadAvatar ref={avatarRef} avatar={avatar} lang={lang} />
             </div>
           </div>
@@ -1155,6 +1429,8 @@ export default function App() {
           onStopSpeaking={handleStopSpeaking}
           presentations={presentations}
           presentationContent={presentationContent}
+          presentationName={activePresentationName ?? ""}
+          userName={user?.name ?? user?.email}
           onStartPresentation={handleStartPresentation}
           onContinuePresentation={handleContinuePresentation}
           onSwitchToChat={() => handleViewChange("chat")}
@@ -1165,7 +1441,10 @@ export default function App() {
 
       <PresentationDialog
         open={presentationDialogOpen}
-        onClose={() => setPresentationDialogOpen(false)}
+        onClose={() => {
+          setPresentationDialogOpen(false);
+          if (!activePresentationName) setView("chat");
+        }}
         defaultLang={lang}
         presentations={presentations}
         onSelect={(payload) => {
