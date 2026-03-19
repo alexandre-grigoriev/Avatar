@@ -1,0 +1,28 @@
+Bonjour et Bienvenu chez Horiba France
+image:slide1.png
+-------
+Je suis L'intelligence Artificiel chargé de vous former sur EQS.
+image:slide2.png
+-------
+Aujourd'hui, nous allons aborder plusieurs points importants dans l'organisation de la société : La qualité, la sécurité et les risques liés à votre poste ; les situations d'urgence et enfin les impacts de notre activité sur l'environnement.
+image:slide3.png
+-------
+INTRODUCTION
+image:slide4.png
+-------
+Pourquoi une formation Environnement Qualité Sécurité (EQS) ? Le Code du travail impose à lemployeur une obligation générale de sécurité envers ses salariés. Ainsi, toute personne nouvellement embauchée doit bénéficier, avant la prise de poste, dune formation à la sécurité adaptée à son poste de travail Par ailleurs, selon les référentiels ISO (Qualité) et ISO  (Environnement), HORIBA France doit sassurer que lensemble de ses collaborateurs, dès leur arrivée, reçoivent une formation appropriée afin de : Garantir la conformité des produits et services proposés Comprendre limpact de leur activité sur lenvironnement Adopter des comportements permettant déviter les incidents Contribuer à la performance globale de lentreprise .
+image:slide5.png
+-------
+Qualité
+image:slide6.png
+-------
+Qu'est-ce qu'un système de management EQS ? HORIBA France est certifiée ISO et ISO pour les sites de Loos et Palaiseau. Le site de Vénissieux est en cours de certification. Pourquoi ces certifications ? Les certifications ISO sont des démarches volontaires entreprises par HORIBA France dans le but de : Améliorer ses performances internes Répondre aux exigences de ses clients et du marché Améliorer son image grâce à des certifications reconnues à léchelle internationale, renvoyant limage dune entreprise sérieuse, organisée et responsable Respecter les obligations légales Anticiper les risques et limiter les incidents et accidents de travail Les normes ISO définissent les bonnes pratiques permettant daméliorer lorganisation de lentreprise . Ces bonnes pratiques sont accessibles sur le portail HFR de SharePoint, dans lespace EQS, rubrique « Informations EQS »
+image:slide7.png
+-------
+Base Sécurité: Que trouve-t-on dans cette base ? La base sécurité plus communément appelée base risque est accessible sur le Portal HFR de Sharepoint : dans l'item EQS, rubrique : Informations EQS - activité Securité Vous y trouverez : Le Document unique d'évaluation des risques professionnels. Ce document est obligatoire au regard de code du travail. Il recense l'ensemble des risques auxquels sont exposés les salariés Les « outils de formation » : le lien de connexion à la plateforme en ligne E-prévention et un powerpoint de formation général. Les fiches risques qui détaillent les risques auxquels vous êtes exposés et vous informent des précautions à mettre en œuvre pour protéger votre santé et votre sécurité ainsi que celles des autres qui vous entourent. Les FDS, « Fiches de données de sécurité des produits chimiques » qui vous informent des dangers liés à l'utilisation de ces produits. Toutes ces informations sont classées par unité de travail, pour vous permettre de les retrouver plus facilement. Vous trouverez également des informations concernant les comportements à tenir pour réagir en cas d'urgence : Accident, déclenchement d'alarme, …
+image:slide8.png
+-------
+Je vous remercie pour votre attention et je reste à votre disposition pour toute question .
+image:slide9.png
+-------
+quiz:NO

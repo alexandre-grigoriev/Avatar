@@ -1,4 +1,5 @@
 import "dotenv/config";
+import dns from "dns";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -10,6 +11,11 @@ import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
+import multer from "multer";
+import JSZip from "jszip";
+import { exec } from "child_process";
+import { promisify } from "util";
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -20,7 +26,9 @@ const ADMIN_SEED_EMAIL = process.env.ADMIN_SEED_EMAIL  || "alexandre.grigoriev@h
 const PORT             = process.env.PORT              || 3001;
 const FRONTEND_ORIGIN  = process.env.FRONTEND_ORIGIN   || "http://localhost:5173";
 const APP_BASE_URL     = process.env.APP_BASE_URL      || FRONTEND_ORIGIN;
-const SMTP_FROM        = process.env.SMTP_FROM         || '"AVATAR Platform" <noreply@avatar.horiba.com>';
+// Default FROM to the authenticated SMTP user to avoid Office365 "Send As" rejection
+const SMTP_FROM = process.env.SMTP_FROM ||
+  (process.env.SMTP_USER ? `"AVATAR Platform" <${process.env.SMTP_USER}>` : '"AVATAR Platform" <noreply@avatar.horiba.com>');
 
 const COOKIE_NAME     = process.env.COOKIE_NAME     || "avatar_session";
 const COOKIE_SECURE   = String(process.env.COOKIE_SECURE || "false") === "true";
@@ -85,15 +93,30 @@ const stmtGoogleUpsert  = db.prepare(`
 `);
 
 // ── Email / SMTP ──────────────────────────────────────────────────────────────
+// Pre-resolve hostname to IPv4 so nodemailer never does its own DNS (which picks IPv6)
+const _smtpHostResolved = process.env.SMTP_HOST
+  ? await new Promise((resolve) =>
+      dns.resolve4(process.env.SMTP_HOST, (err, addrs) => {
+        const ip = !err && addrs?.length ? addrs[0] : process.env.SMTP_HOST;
+        if (!err) console.log(`SMTP ${process.env.SMTP_HOST} → ${ip} (IPv4)`);
+        resolve(ip);
+      })
+    )
+  : null;
+
 const transporter = nodemailer.createTransport(
-  process.env.SMTP_HOST
+  _smtpHostResolved
     ? {
-        host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || "587"),
-        secure: process.env.SMTP_SECURE === "true",
+        host:              _smtpHostResolved,
+        port:              parseInt(process.env.SMTP_PORT || "587"),
+        secure:            process.env.SMTP_SECURE === "true",
+        connectionTimeout: 5_000,
+        greetingTimeout:   5_000,
+        socketTimeout:     5_000,
         auth:   process.env.SMTP_USER
           ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
           : undefined,
+        tls: { rejectUnauthorized: false },
       }
     : { jsonTransport: true } // dev fallback: logs email as JSON
 );
@@ -154,24 +177,26 @@ function verificationEmailHtml(name, verifyUrl) {
 
 async function sendVerificationEmail(email, name, token) {
   const verifyUrl = `${APP_BASE_URL}/api/auth/verify?token=${token}`;
-  const info = await transporter.sendMail({
-    from:    SMTP_FROM,
-    to:      email,
-    subject: "Confirm your AVATAR Platform account",
-    html:    verificationEmailHtml(name, verifyUrl),
-  });
-  // Dev fallback: log the link when no real SMTP
-  if (info?.envelope === undefined && info?.message) {
-    const msg = JSON.parse(info.message);
-    console.log("\n── [DEV] Verification email ──────────────────────");
-    console.log("To:      ", email);
-    console.log("Link:    ", verifyUrl);
-    console.log("─────────────────────────────────────────────────\n");
-  } else if (!process.env.SMTP_HOST) {
-    console.log("\n── [DEV] Verification email ──────────────────────");
-    console.log("To:      ", email);
-    console.log("Link:    ", verifyUrl);
-    console.log("─────────────────────────────────────────────────\n");
+
+  // Always print link to console (useful in dev and as fallback)
+  console.log("\n── Verification email ────────────────────────────");
+  console.log("To:  ", email);
+  console.log("Link:", verifyUrl);
+  console.log("From:", SMTP_FROM);
+  console.log("─────────────────────────────────────────────────\n");
+
+  if (!process.env.SMTP_HOST) return; // dev mode: console only
+
+  try {
+    await transporter.sendMail({
+      from:    SMTP_FROM,
+      to:      email,
+      subject: "Confirm your AVATAR Platform account",
+      html:    verificationEmailHtml(name, verifyUrl),
+    });
+    console.log("✓ Verification email sent to", email);
+  } catch (err) {
+    console.error("✗ SMTP send failed (user was saved; use console link above):", err.message);
   }
 }
 
@@ -246,7 +271,7 @@ async function initGoogle() {
 
 // ── Express ───────────────────────────────────────────────────────────────────
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 
@@ -311,24 +336,30 @@ app.post("/api/auth/register", async (req, res) => {
     if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
 
     const existing = stmtFindByEmail.get(email);
-    if (existing && existing.verified && existing.provider !== "seed")
+    if (existing?.verified && existing?.provider !== "seed" && existing?.provider !== "google")
       return res.status(409).json({ error: "An account with this email already exists" });
 
-    const passwordHash  = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const displayName  = name?.trim() || email.split("@")[0];
+
+    if (existing?.provider === "google") {
+      // Google user adding email+password — email already proven, activate immediately
+      db.prepare("UPDATE users SET name=COALESCE(NULLIF(?,name),name), password_hash=? WHERE email=?")
+        .run(displayName, passwordHash, email);
+      return res.json({ ok: true, linked: true });
+    }
+
     const verifyToken   = crypto.randomBytes(32).toString("hex");
     const verifyExpires = new Date(Date.now() + VERIFY_TTL_MS).toISOString();
-    const displayName   = name?.trim() || email.split("@")[0];
 
     if (existing) {
       // Re-registration of unverified account: refresh token + password
-      db.prepare(`
-        UPDATE users SET name=?, password_hash=?, verify_token=?, verify_expires=?, verified=0 WHERE email=?
-      `).run(displayName, passwordHash, verifyToken, verifyExpires, email);
+      db.prepare(`UPDATE users SET name=?, password_hash=?, verify_token=?, verify_expires=?, verified=0 WHERE email=?`)
+        .run(displayName, passwordHash, verifyToken, verifyExpires, email);
     } else {
-      db.prepare(`
-        INSERT INTO users (id, email, name, password_hash, provider, verified, verify_token, verify_expires)
-        VALUES (?, ?, ?, ?, 'email', 0, ?, ?)
-      `).run("email-" + makeId(), email, displayName, passwordHash, verifyToken, verifyExpires);
+      db.prepare(`INSERT INTO users (id, email, name, password_hash, provider, verified, verify_token, verify_expires)
+        VALUES (?, ?, ?, ?, 'email', 0, ?, ?)`)
+        .run("email-" + makeId(), email, displayName, passwordHash, verifyToken, verifyExpires);
     }
 
     await sendVerificationEmail(email, displayName, verifyToken);
@@ -369,8 +400,9 @@ app.post("/api/auth/login", async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
 
     const user = stmtFindByEmail.get(email);
-    if (!user || !user.password_hash)
-      return res.status(401).json({ error: "Invalid email or password" });
+    if (!user) return res.status(401).json({ error: "Invalid email or password" });
+    if (!user.password_hash)
+      return res.status(401).json({ error: "This account uses Google Sign-In. Please use the Google button.", code: "google_account" });
 
     if (!user.verified)
       return res.status(403).json({ error: "Please verify your email before signing in. Check your inbox.", code: "unverified" });
@@ -396,10 +428,18 @@ app.post("/api/auth/resend-verification", async (req, res) => {
     const user = stmtFindByEmail.get(email);
     if (!user || user.verified) return res.json({ ok: true }); // silent — don't reveal existence
 
-    const verifyToken   = crypto.randomBytes(32).toString("hex");
-    const verifyExpires = new Date(Date.now() + VERIFY_TTL_MS).toISOString();
-    db.prepare("UPDATE users SET verify_token=?, verify_expires=? WHERE id=?")
-      .run(verifyToken, verifyExpires, user.id);
+    // Reuse existing token if still valid; otherwise issue a fresh one
+    const tokenStillValid = user.verify_token && user.verify_expires &&
+      new Date(user.verify_expires) > new Date();
+    const verifyToken = tokenStillValid
+      ? user.verify_token
+      : crypto.randomBytes(32).toString("hex");
+    const verifyExpires = tokenStillValid
+      ? user.verify_expires
+      : new Date(Date.now() + VERIFY_TTL_MS).toISOString();
+    if (!tokenStillValid)
+      db.prepare("UPDATE users SET verify_token=?, verify_expires=? WHERE id=?")
+        .run(verifyToken, verifyExpires, user.id);
     await sendVerificationEmail(email, user.name, verifyToken);
     res.json({ ok: true });
   } catch (e) {
@@ -461,8 +501,124 @@ app.put("/api/users/:id/role", requireAuth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Presentation import ───────────────────────────────────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+// Convert PDF → 1920×1080 PNGs via Python/PyMuPDF script
+const PDF_SCRIPT = path.join(__dirname, "pdf_to_images.py");
+
+async function pdfToImages(pdfBuffer, outDir, W = 1920, H = 1080) {
+  // Write buffer to a temp file (Python script reads from disk)
+  const tmpPdf = path.join(outDir, "_upload.pdf");
+  fs.writeFileSync(tmpPdf, pdfBuffer);
+  try {
+    const { stdout } = await execAsync(
+      `python "${PDF_SCRIPT}" "${tmpPdf}" "${outDir}" ${W} ${H}`
+    );
+    return JSON.parse(stdout.trim());
+  } finally {
+    fs.unlinkSync(tmpPdf);
+  }
+}
+
+// Extract notes text per slide from PPTX buffer
+async function extractPptxNotes(pptxBuffer) {
+  const zip     = await JSZip.loadAsync(pptxBuffer);
+  const presXml = await zip.file("ppt/presentation.xml")?.async("string") ?? "";
+  const presRels = await zip.file("ppt/_rels/presentation.xml.rels")?.async("string") ?? "";
+
+  // Build rId → slide filename map
+  const rIdToSlide = {};
+  for (const m of presRels.matchAll(/Id="(rId\d+)"[^>]*Target="slides\/(slide\d+\.xml)"/g))
+    rIdToSlide[m[1]] = m[2];
+
+  // Slide order from <p:sldId r:id="...">
+  const slideOrder = [...presXml.matchAll(/<p:sldId[^>]+r:id="(rId\d+)"/g)].map(m => m[1]);
+
+  const notes = [];
+  for (const rId of slideOrder) {
+    const slideName = rIdToSlide[rId];
+    if (!slideName) { notes.push(""); continue; }
+
+    const slideNum  = slideName.match(/slide(\d+)\.xml/)?.[1];
+    const slideRels = await zip.file(`ppt/slides/_rels/slide${slideNum}.xml.rels`)?.async("string") ?? "";
+    const noteFile  = slideRels.match(/Target="\.\.\/notesSlides\/(notesSlide\d+\.xml)"/)?.[1];
+    if (!noteFile) { notes.push(""); continue; }
+
+    const noteXml = await zip.file(`ppt/notesSlides/${noteFile}`)?.async("string") ?? "";
+
+    // Remove slide-image and slide-number placeholder shapes, then extract all <a:t> text
+    const cleaned = noteXml
+      .replace(/<p:sp>(?:(?!<\/p:sp>)[\s\S])*?type="sldImg"(?:(?!<\/p:sp>)[\s\S])*?<\/p:sp>/g, "")
+      .replace(/<p:sp>(?:(?!<\/p:sp>)[\s\S])*?type="sldNum"(?:(?!<\/p:sp>)[\s\S])*?<\/p:sp>/g, "");
+    const text = [...cleaned.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)]
+      .map(m => m[1].trim()).filter(Boolean).join(" ");
+    notes.push(text);
+  }
+  return notes;
+}
+
+function buildContentFile(notes, images, quizEnabled = false) {
+  const count = Math.max(notes.length, images.length);
+  const blocks = [];
+  for (let i = 0; i < count; i++) {
+    const lines = [];
+    if (notes[i])  lines.push(notes[i]);
+    if (images[i]) lines.push(`image:${images[i]}`);
+    blocks.push(lines.join("\n"));
+  }
+  return blocks.join("\n-------\n") + `\n-------\nquiz:${quizEnabled ? "YES" : "NO"}`;
+}
+
+app.post("/api/presentations/import",
+  requireAuth, requireAdmin,
+  upload.fields([{ name: "pptx", maxCount: 1 }, { name: "pdf", maxCount: 1 }]),
+  async (req, res) => {
+    const { name, description, language } = req.body;
+    if (!name?.trim())      return res.status(400).json({ error: "Name is required" });
+    if (!req.files?.pdf?.[0]) return res.status(400).json({ error: "PDF file is required" });
+
+    const safeName = name.trim();
+    const outDir   = path.join(UPLOADS_DIR, safeName);
+    fs.mkdirSync(outDir, { recursive: true });
+
+    try {
+      // 1. Convert PDF pages → 1920×1080 PNGs
+      const images = await pdfToImages(req.files.pdf[0].buffer, outDir);
+
+      // 2. Extract notes from PPTX (optional)
+      let notes = [];
+      if (req.files?.pptx?.[0]) {
+        notes = await extractPptxNotes(req.files.pptx[0].buffer);
+      }
+
+      // 3. Build and save content file
+      const longLang = language || "english";
+      const content  = buildContentFile(notes, images);
+      fs.writeFileSync(path.join(outDir, `content_${longLang}.txt`), content, "utf-8");
+
+      // 4. Update files.json
+      const filesJsonPath = path.join(UPLOADS_DIR, "files.json");
+      let filesData = { files: [] };
+      try { filesData = JSON.parse(fs.readFileSync(filesJsonPath, "utf-8")); } catch {}
+      filesData.files = filesData.files.filter(f => f.name !== safeName);
+      filesData.files.push({ name: safeName, description: description?.trim() || "", language: longLang });
+      fs.writeFileSync(filesJsonPath, JSON.stringify(filesData, null, 2));
+
+      res.json({ ok: true, slides: images.length, notes: notes.filter(Boolean).length });
+    } catch (e) {
+      console.error("Import error:", e);
+      res.status(500).json({ error: "Import failed: " + e.message });
+    }
+  }
+);
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 await initGoogle();
+// Prevent rogue SMTP / socket errors from crashing the process
+process.on("uncaughtException",  (err) => console.error("Uncaught:", err.message));
+process.on("unhandledRejection", (err) => console.error("Unhandled rejection:", err));
+
 app.listen(PORT, () => {
   console.log(`Auth backend  → http://localhost:${PORT}`);
   console.log(`Frontend      → ${FRONTEND_ORIGIN}`);

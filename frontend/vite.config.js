@@ -9,6 +9,8 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3001",
         changeOrigin: true,
+        proxyTimeout: 300000,  // 5 min — PDF/PPTX import can take time
+        timeout: 300000,
       },
       "/auth": {
         target: "http://localhost:3001",

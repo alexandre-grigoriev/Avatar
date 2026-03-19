@@ -4,6 +4,11 @@
       "name": "HORIBA EQS",
       "description": "this is presentation about horiba EQS",
       "language": "french, english"
+    },
+    {
+      "name": "TEST",
+      "description": "TEST",
+      "language": "french"
     }
   ]
 }

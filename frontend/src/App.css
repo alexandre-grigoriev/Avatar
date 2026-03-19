@@ -566,6 +566,16 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   color: #dc2626;
   line-height: 1.5;
 }
+.authSuccess{
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #16a34a;
+  line-height: 1.5;
+}
 
 .authInbox{
   display: flex;

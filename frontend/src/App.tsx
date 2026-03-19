@@ -235,16 +235,18 @@ function AuthDialog({
 }) {
   const [screen, setScreen]   = useState<AuthScreen>("signin");
   const [email, setEmail]     = useState("");
+  const [nickname, setNickname] = useState("");
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resent, setResent]   = useState(false);
+  const [linked, setLinked]   = useState(false);
 
   // Reset state when dialog opens
   useEffect(() => {
-    if (open) { setScreen("signin"); setEmail(""); setPassword(""); setConfirm(""); setError(""); setUnverifiedEmail(""); setResent(false); }
+    if (open) { setScreen("signin"); setEmail(""); setNickname(""); setPassword(""); setConfirm(""); setError(""); setUnverifiedEmail(""); setResent(false); setLinked(false); }
   }, [open]);
 
   async function handleSignIn(e: React.FormEvent) {
@@ -260,6 +262,7 @@ function AuthDialog({
       const data = await res.json();
       if (res.ok) { onSuccess(); }
       else if (data.code === "unverified") { setUnverifiedEmail(email.trim()); setError(data.error); }
+      else if (data.code === "google_account") { setError(""); setScreen("signin"); setTimeout(() => setError(data.error), 50); }
       else setError(data.error || "Sign in failed");
     } catch { setError("Network error. Please try again."); }
     finally { setLoading(false); }
@@ -275,10 +278,11 @@ function AuthDialog({
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password, name: nickname.trim() || undefined }),
       });
       const data = await res.json();
-      if (res.ok) { setScreen("inbox"); }
+      if (res.ok && data.linked) { setScreen("signin"); setLinked(true); }
+      else if (res.ok) { setScreen("inbox"); }
       else setError(data.error || "Registration failed");
     } catch { setError("Network error. Please try again."); }
     finally { setLoading(false); }
@@ -347,6 +351,9 @@ function AuthDialog({
                     <div className="authLabel">Password</div>
                     <PasswordInput value={password} onChange={setPassword} />
                   </div>
+                  {linked && !error && (
+                    <div className="authSuccess">Password added! You can now sign in with email or Google.</div>
+                  )}
                   {error && (
                     <div className="authError">
                       {error}
@@ -380,8 +387,12 @@ function AuthDialog({
                   <GoogleBtn />
                   <Divider />
                   <div className="authField">
+                    <div className="authLabel">Nickname <span style={{ color: "#9ca3af", fontWeight: 400 }}>(display name)</span></div>
+                    <input className="authInput" type="text" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="How should we call you?" autoFocus />
+                  </div>
+                  <div className="authField">
                     <div className="authLabel">Email</div>
-                    <input className="authInput" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" required autoFocus />
+                    <input className="authInput" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" required />
                   </div>
                   <div className="authField">
                     <div className="authLabel">Password <span style={{ color: "#9ca3af", fontWeight: 400 }}>(min. 8 characters)</span></div>
@@ -447,6 +458,7 @@ function PresentationDialog({
   onSelect,
   defaultLang,
   presentations,
+  isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
@@ -456,22 +468,47 @@ function PresentationDialog({
   ) => void;
   defaultLang: string;
   presentations: Presentation[];
+  isAdmin: boolean;
 }) {
   const [mode, setMode] = useState<"new" | "existing">("existing");
   const [existingName, setExistingName] = useState(presentations[0]?.name ?? "");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [lang, setLang] = useState(defaultLang);
-  const [file, setFile] = useState<File | null>(null);
+  const [pptxFile, setPptxFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile]   = useState<File | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
 
   useEffect(() => {
     if (open) {
       setLang(defaultLang);
       if (presentations.length) setExistingName(presentations[0].name);
+      setPptxFile(null); setPdfFile(null); setImportError("");
     }
   }, [open, defaultLang, presentations]);
+
+  async function handleImport() {
+    if (!name.trim() || !pdfFile) return;
+    setImporting(true); setImportError("");
+    try {
+      const form = new FormData();
+      form.append("name", name.trim());
+      form.append("description", description.trim());
+      form.append("language", LANG_TO_LONG[lang] ?? "english");
+      form.append("pdf", pdfFile);
+      if (pptxFile) form.append("pptx", pptxFile);
+      const res  = await fetch("/api/presentations/import", { method: "POST", credentials: "include", body: form });
+      const text = await res.text();
+      const data = (() => { try { return JSON.parse(text); } catch { return { error: text || "Import failed" }; } })();
+      if (!res.ok) { setImportError(data.error || "Import failed"); return; }
+      onSelect({ mode: "new", name: name.trim(), description: description.trim(), lang });
+      onClose();
+    } catch { setImportError("Network error. Please try again."); }
+    finally  { setImporting(false); }
+  }
 
   const selectedPresentation = useMemo(
     () => presentations.find((p) => p.name === existingName),
@@ -505,13 +542,15 @@ function PresentationDialog({
                   <span className="presModeBtnTitle">Existing presentation</span>
                   <span className="presModeBtnDesc">Pick from the library</span>
                 </button>
-                <button
-                  className={cn("presModeBtn", mode === "new" && "presModeBtnActive")}
-                  onClick={() => setMode("new")}
-                >
-                  <span className="presModeBtnTitle">New presentation</span>
-                  <span className="presModeBtnDesc">Upload and register a new presentation</span>
-                </button>
+                {isAdmin && (
+                  <button
+                    className={cn("presModeBtn", mode === "new" && "presModeBtnActive")}
+                    onClick={() => setMode("new")}
+                  >
+                    <span className="presModeBtnTitle">New presentation</span>
+                    <span className="presModeBtnDesc">Upload and register a new presentation</span>
+                  </button>
+                )}
               </div>
 
               <div className="presForm">
@@ -601,21 +640,26 @@ function PresentationDialog({
                       </div>
                     </div>
                     <div className="presFieldRow">
-                      <div className="presFieldLabel">Upload presentation (images/PDF)</div>
+                      <div className="presFieldLabel">PDF file <span style={{color:"#6b7280",fontWeight:400}}>(slides exported from PowerPoint)</span></div>
                       <div className="presFileUpload">
                         <label className="presFileBtn">
-                          Choose File
-                          <input
-                            type="file"
-                            accept=".pdf,.ppt,.pptx,image/*"
-                            multiple
-                            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                            className="presFileInput"
-                          />
+                          Choose PDF
+                          <input type="file" accept=".pdf" onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)} className="presFileInput" />
                         </label>
-                        <span className="presFileName">{file ? file.name : "No file chosen"}</span>
+                        <span className="presFileName">{pdfFile ? pdfFile.name : "No file chosen"}</span>
                       </div>
                     </div>
+                    <div className="presFieldRow">
+                      <div className="presFieldLabel">PPTX file <span style={{color:"#6b7280",fontWeight:400}}>(optional — for slide notes)</span></div>
+                      <div className="presFileUpload">
+                        <label className="presFileBtn">
+                          Choose PPTX
+                          <input type="file" accept=".pptx,.ppt" onChange={(e) => setPptxFile(e.target.files?.[0] ?? null)} className="presFileInput" />
+                        </label>
+                        <span className="presFileName">{pptxFile ? pptxFile.name : "No file chosen"}</span>
+                      </div>
+                    </div>
+                    {importError && <div className="authError" style={{marginTop:8}}>{importError}</div>}
                   </>
                 )}
               </div>
@@ -633,15 +677,10 @@ function PresentationDialog({
                 ) : (
                   <button
                     className="presSubmitBtn"
-                    disabled={!name.trim()}
-                    onClick={() => {
-                      if (name.trim()) {
-                        onSelect({ mode: "new", name: name.trim(), description: description.trim(), lang, file });
-                        onClose();
-                      }
-                    }}
+                    disabled={!name.trim() || !pdfFile || importing}
+                    onClick={handleImport}
                   >
-                    Create
+                    {importing ? "Importing…" : "Import"}
                   </button>
                 )}
               </div>
@@ -1352,7 +1391,8 @@ export default function App() {
   // ── Load slide data from API ──
   async function loadPresentation(name: string, langOverride?: string) {
     try {
-      const longLang = LANG_TO_LONG[langOverride ?? lang] ?? "english";
+      // Accept both short ("fr") and long ("french") lang override
+      const longLang = LANG_TO_LONG[langOverride ?? lang] ?? langOverride ?? "english";
       const res = await fetch(
         `/api/presentation-data?file_name=${encodeURIComponent(name)}&language=${encodeURIComponent(longLang)}`,
         { credentials: "include" }
@@ -1629,13 +1669,20 @@ export default function App() {
         }}
         defaultLang={lang}
         presentations={presentations}
+        isAdmin={user?.role === "admin"}
         onSelect={(payload) => {
           if (payload.mode === "existing") {
             loadPresentation(payload.name);
           } else {
-            // New presentation: just set label for now — backend upload not yet wired
+            // Set name eagerly so onClose doesn't switch back to chat
             setActivePresentationName(payload.name);
-            setActivePresentationLabel(payload.name);
+            setView("presentation");
+            // Reload list then load slides
+            fetch("/api/list-presentations", { credentials: "include" })
+              .then((r) => r.json())
+              .then((data: Presentation[]) => { if (Array.isArray(data)) setPresentations(data); })
+              .catch(() => {})
+              .finally(() => loadPresentation(payload.name, payload.lang));
           }
         }}
       />
