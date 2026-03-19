@@ -583,17 +583,20 @@ app.post("/api/presentations/import",
     fs.mkdirSync(outDir, { recursive: true });
 
     try {
+      const longLang = language || "english";
+
       // 1. Convert PDF pages → 1920×1080 PNGs
       const images = await pdfToImages(req.files.pdf[0].buffer, outDir);
 
-      // 2. Extract notes from PPTX (optional)
+      // 2. Extract notes from PPTX or fill blanks (Gemini summarization runs on the frontend after import)
       let notes = [];
       if (req.files?.pptx?.[0]) {
         notes = await extractPptxNotes(req.files.pptx[0].buffer);
+      } else {
+        notes = images.map(() => "No slide notes");
       }
 
       // 3. Build and save content file
-      const longLang = language || "english";
       const content  = buildContentFile(notes, images);
       fs.writeFileSync(path.join(outDir, `content_${longLang}.txt`), content, "utf-8");
 
@@ -605,13 +608,76 @@ app.post("/api/presentations/import",
       filesData.files.push({ name: safeName, description: description?.trim() || "", language: longLang });
       fs.writeFileSync(filesJsonPath, JSON.stringify(filesData, null, 2));
 
-      res.json({ ok: true, slides: images.length, notes: notes.filter(Boolean).length });
+      res.json({ ok: true, slides: images.length, notes: notes.filter(Boolean).length, images, name: safeName, language: longLang });
     } catch (e) {
       console.error("Import error:", e);
       res.status(500).json({ error: "Import failed: " + e.message });
     }
   }
 );
+
+// Patch notes after Gemini summarization (frontend calls this after generating notes)
+app.patch("/api/presentations/:name/notes", requireAuth, requireAdmin, express.json(), async (req, res) => {
+  const { name } = req.params;
+  const { notes, language } = req.body;
+  if (!Array.isArray(notes) || !language) return res.status(400).json({ error: "notes[] and language required" });
+
+  const contentPath = path.join(UPLOADS_DIR, name, `content_${language}.txt`);
+  if (!fs.existsSync(contentPath)) return res.status(404).json({ error: "Content file not found" });
+
+  const existing = fs.readFileSync(contentPath, "utf-8");
+  const blocks = existing.split("\n-------\n");
+  const quizBlock = blocks[blocks.length - 1]; // preserve quiz:YES/NO line
+
+  // Rebuild blocks replacing only the text part (keep image: lines)
+  const rebuilt = blocks.slice(0, -1).map((block, i) => {
+    const lines = block.split("\n").filter(l => l.startsWith("image:") || l.startsWith("quiz:"));
+    if (notes[i]) lines.unshift(notes[i]);
+    return lines.join("\n");
+  });
+  fs.writeFileSync(contentPath, rebuilt.join("\n-------\n") + "\n-------\n" + quizBlock, "utf-8");
+  res.json({ ok: true });
+});
+
+// Send quiz results by SMTP
+app.post("/api/quiz/send-results", requireAuth, express.json(), async (req, res) => {
+  const { to, subject, text } = req.body;
+  if (!to || !subject || !text) return res.status(400).json({ error: "to, subject, text required" });
+  try {
+    await transporter.sendMail({ from: SMTP_FROM, to, subject, text });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Quiz results mail error:", e.message);
+    res.status(500).json({ error: "Failed to send email: " + e.message });
+  }
+});
+
+// Save generated quiz questions to question.json
+app.post("/api/presentations/:name/quiz", requireAuth, requireAdmin, express.json(), (req, res) => {
+  const { name } = req.params;
+  const { questions, sendto } = req.body;
+  if (!Array.isArray(questions)) return res.status(400).json({ error: "questions[] required" });
+
+  const presDir = path.join(UPLOADS_DIR, name);
+  if (!fs.existsSync(presDir)) return res.status(404).json({ error: "Presentation not found" });
+
+  fs.writeFileSync(
+    path.join(presDir, "question.json"),
+    JSON.stringify({ sendto: sendto || "", questions }, null, 2),
+    "utf-8"
+  );
+
+  // Flip quiz:NO → quiz:YES in all content_*.txt files for this presentation
+  for (const file of fs.readdirSync(presDir)) {
+    if (/^content_.+\.txt$/.test(file)) {
+      const p = path.join(presDir, file);
+      const updated = fs.readFileSync(p, "utf-8").replace(/quiz:NO\s*$/, "quiz:YES");
+      fs.writeFileSync(p, updated, "utf-8");
+    }
+  }
+
+  res.json({ ok: true });
+});
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 await initGoogle();

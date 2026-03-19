@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import TalkingHeadAvatar, { type TalkingHeadAvatarHandle } from "./TalkingHeadAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,6 +23,8 @@ import {
   classifyIntent,
   generateQuizQuestions,
   translateQuizQuestions,
+  summarizeSlideImage,
+  generateQuizFile,
   type ChatMessage,
   type Presentation,
   type QuizQuestion,
@@ -451,11 +454,118 @@ function AuthDialog({
   );
 }
 
+// ─── QuizGenerationDialog ─────────────────────────────────────────────────────
+function QuizGenerationDialog({
+  presName, presLang, onClose, onQuizSaved,
+}: { presName: string; presLang: string; onClose: () => void; onQuizSaved?: () => void }) {
+  const [step, setStep]           = useState<"ask" | "form" | "generating" | "done">("ask");
+  const [count, setCount]         = useState(5);
+  const [email, setEmail]         = useState("");
+  const [error, setError]         = useState("");
+
+  async function generate() {
+    setStep("generating"); setError("");
+    try {
+      const contentRes  = await fetch(`/uploads/${encodeURIComponent(presName)}/content_${presLang}.txt`);
+      const content     = await contentRes.text();
+      const questions   = await generateQuizFile(content, presLang, count);
+      if (!questions.length) throw new Error("Gemini returned no questions");
+      const saveRes = await fetch(`/api/presentations/${encodeURIComponent(presName)}/quiz`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions, sendto: email }),
+      });
+      if (!saveRes.ok) { const d = await saveRes.json().catch(() => ({})); throw new Error(d.error || `Save failed: ${saveRes.status}`); }
+      setStep("done");
+      onQuizSaved?.();
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : null) ?? "Generation failed");
+      setStep("form");
+    }
+  }
+
+  const dialogStyle: React.CSSProperties = {
+    position: "relative", zIndex: 301,
+    background: "#fff", border: "1px solid #e5e7eb",
+    borderRadius: 16, padding: "32px 28px", width: 440, maxWidth: "90vw",
+    boxShadow: "0 40px 80px rgba(0,0,0,0.18)",
+    color: "#111827",
+  };
+
+  return (
+    <motion.div className="modalOverlay" style={{ zIndex: 300 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <div className="modalBackdrop" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.18 }} style={dialogStyle}>
+
+        {step === "ask" && (<>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 10 }}>Generate a quiz?</div>
+          <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
+            Would you like Gemini to generate quiz questions for <strong style={{ color: "#111827" }}>{presName}</strong>?
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button className="presSubmitBtn" onClick={() => setStep("form")}>Yes — generate quiz</button>
+            <button className="presCancelBtn" onClick={onClose}>Skip</button>
+          </div>
+        </>)}
+
+        {step === "form" && (<>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 20 }}>Quiz settings</div>
+          <div className="presFieldRow" style={{ marginBottom: 16 }}>
+            <div className="presFieldLabel">Number of questions</div>
+            <input
+              type="number" min={1} max={30} value={count}
+              onChange={e => setCount(Math.max(1, Math.min(30, Number(e.target.value))))}
+              className="presFieldInput" style={{ width: 100 }}
+            />
+          </div>
+          <div className="presFieldRow" style={{ marginBottom: 16 }}>
+            <div className="presFieldLabel">Reviewer e-mail <span style={{ color: "#6b7280", fontWeight: 400 }}>(optional)</span></div>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="reviewer@example.com"
+              className="presFieldInput"
+            />
+          </div>
+          {error && <div className="authError" style={{ marginBottom: 12 }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <button className="presSubmitBtn" style={{ flex: 1 }} onClick={generate}>Generate</button>
+            <button className="presCancelBtn" style={{ flex: 1 }} onClick={onClose}>Skip</button>
+          </div>
+        </>)}
+
+        {step === "generating" && (
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <div style={{ fontSize: 15, color: "#6b7280", marginBottom: 12 }}>Generating {count} questions with Gemini…</div>
+            <div className="presFieldLabel" style={{ color: "#478cd0" }}>Please wait</div>
+          </div>
+        )}
+
+        {step === "done" && (<>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 10 }}>Quiz saved!</div>
+          <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
+            {count} questions generated.
+            {email
+              ? <> Quiz results will be reviewed by <strong style={{ color: "#111827" }}>{email}</strong>.</>
+              : <> No reviewer email set.</>
+            }
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button className="presSubmitBtn" onClick={onClose}>Close</button>
+          </div>
+        </>)}
+
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── PresentationDialog ───────────────────────────────────────────────────────
 function PresentationDialog({
   open,
   onClose,
   onSelect,
+  onQuizReady,
   defaultLang,
   presentations,
   isAdmin,
@@ -466,6 +576,7 @@ function PresentationDialog({
     | { mode: "existing"; name: string }
     | { mode: "new"; name: string; description: string; lang: string; file?: File | null }
   ) => void;
+  onQuizReady: (presName: string, presLang: string) => void;
   defaultLang: string;
   presentations: Presentation[];
   isAdmin: boolean;
@@ -481,33 +592,91 @@ function PresentationDialog({
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [showSummarizeConfirm, setShowSummarizeConfirm] = useState(false);
 
   useEffect(() => {
     if (open) {
       setLang(defaultLang);
       if (presentations.length) setExistingName(presentations[0].name);
-      setPptxFile(null); setPdfFile(null); setImportError("");
+      setPptxFile(null); setPdfFile(null); setImportError(""); setShowSummarizeConfirm(false);
     }
   }, [open, defaultLang, presentations]);
 
-  async function handleImport() {
+  async function doImport(summarize: "gemini" | "none") {
     if (!name.trim() || !pdfFile) return;
+    setShowSummarizeConfirm(false);
     setImporting(true); setImportError("");
     try {
       const form = new FormData();
       form.append("name", name.trim());
       form.append("description", description.trim());
-      form.append("language", LANG_TO_LONG[lang] ?? "english");
+      const longLang = LANG_TO_LONG[lang] ?? "english";
+      form.append("language", longLang);
       form.append("pdf", pdfFile);
       if (pptxFile) form.append("pptx", pptxFile);
+      else form.append("summarize", "none"); // always use "none" on backend; Gemini runs here
       const res  = await fetch("/api/presentations/import", { method: "POST", credentials: "include", body: form });
       const text = await res.text();
       const data = (() => { try { return JSON.parse(text); } catch { return { error: text || "Import failed" }; } })();
       if (!res.ok) { setImportError(data.error || "Import failed"); return; }
+
+      // Gemini summarization — best-effort, never blocks quiz dialog
+      if (summarize === "gemini" && data.images?.length) {
+        const presName = data.name ?? name.trim();
+        try {
+          const notes: string[] = [];
+
+          async function slideToJpegBase64(imgUrl: string): Promise<string> {
+            const imgRes = await fetch(imgUrl);
+            const blob   = await imgRes.blob();
+            const bmp    = await createImageBitmap(blob);
+            const maxW = 1280, maxH = 720;
+            const scale = Math.min(maxW / bmp.width, maxH / bmp.height, 1);
+            const w = Math.round(bmp.width * scale);
+            const h = Math.round(bmp.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
+            return new Promise<string>((resolve) => {
+              canvas.toBlob((b) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(",")[1]);
+                reader.readAsDataURL(b!);
+              }, "image/jpeg", 0.82);
+            });
+          }
+
+          for (const img of data.images as string[]) {
+            const base64  = await slideToJpegBase64(`/uploads/${encodeURIComponent(presName)}/${img}`);
+            const summary = await summarizeSlideImage(base64, longLang);
+            notes.push(summary);
+          }
+          await fetch(`/api/presentations/${encodeURIComponent(presName)}/notes`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notes, language: longLang }),
+          });
+        } catch (geminiErr: unknown) {
+          // Summarization failed — show warning but still proceed to quiz dialog
+          setImportError("Slides imported, but Gemini summarization failed: " + (geminiErr instanceof Error ? geminiErr.message : "unknown error"));
+        }
+      }
+
       onSelect({ mode: "new", name: name.trim(), description: description.trim(), lang });
       onClose();
-    } catch { setImportError("Network error. Please try again."); }
+      onQuizReady(data.name ?? name.trim(), longLang);
+    } catch (e: unknown) { setImportError((e instanceof Error ? e.message : null) ?? "Network error. Please try again."); }
     finally  { setImporting(false); }
+  }
+
+  function handleImport() {
+    if (!name.trim() || !pdfFile) return;
+    if (!pptxFile) {
+      setShowSummarizeConfirm(true);
+    } else {
+      doImport("none");
+    }
   }
 
   const selectedPresentation = useMemo(
@@ -517,6 +686,7 @@ function PresentationDialog({
   const selectedLang = useMemo(() => LANGS.find((l) => l.id === lang), [lang]);
 
   return (
+    <>
     <AnimatePresence>
       {open && (
         <motion.div className="modalOverlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -640,7 +810,7 @@ function PresentationDialog({
                       </div>
                     </div>
                     <div className="presFieldRow">
-                      <div className="presFieldLabel">PDF file <span style={{color:"#6b7280",fontWeight:400}}>(slides exported from PowerPoint)</span></div>
+                      <div className="presFieldLabel">PDF file <span style={{color:"#ef4444",fontWeight:700}}>*</span> <span style={{color:"#6b7280",fontWeight:400}}>(slides exported from PowerPoint)</span></div>
                       <div className="presFileUpload">
                         <label className="presFileBtn">
                           Choose PDF
@@ -689,6 +859,48 @@ function PresentationDialog({
         </motion.div>
       )}
     </AnimatePresence>
+
+    {createPortal(
+      <AnimatePresence>
+        {showSummarizeConfirm && (
+          <motion.div className="modalOverlay" style={{ zIndex: 300 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="modalBackdrop" onClick={() => setShowSummarizeConfirm(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.97 }}
+              transition={{ duration: 0.18 }}
+              style={{
+                position: "relative", zIndex: 301,
+                background: "#fff", border: "1px solid #e5e7eb",
+                borderRadius: 16, padding: "32px 28px", width: 420, maxWidth: "90vw",
+                boxShadow: "0 40px 80px rgba(0,0,0,0.18)",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 10 }}>
+                No PPTX file selected
+              </div>
+              <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
+                Would you like Google Gemini to analyse each slide image and generate spoken notes automatically?
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button className="presSubmitBtn" onClick={() => doImport("gemini")}>
+                  Yes — generate notes with Gemini
+                </button>
+                <button className="presCancelBtn" onClick={() => doImport("none")}>
+                  No — import without notes
+                </button>
+                <button className="presCancelBtn" onClick={() => setShowSummarizeConfirm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 }
 
@@ -847,12 +1059,13 @@ function convertJsonQuestions(raw: Array<{ question: string; type: string; choic
 }
 
 function QuizWidget({
-  presentationContent, presentationName, lang, userName,
+  presentationContent, presentationName, lang, userName, userEmail,
 }: {
   presentationContent: string;
   presentationName: string;
   lang: string;
   userName?: string;
+  userEmail?: string;
 }) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -923,12 +1136,13 @@ function QuizWidget({
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     let score = 0;
     const lines: string[] = [
       `Quiz Results — ${presentationName}`,
       `Date: ${new Date().toLocaleString()}`,
       ...(userName ? [`User: ${userName}`] : []),
+      ...(userEmail ? [`Email: ${userEmail}`] : []),
       "",
     ];
     questions.forEach((q, i) => {
@@ -942,9 +1156,16 @@ function QuizWidget({
     lines.push(`Score: ${score} / ${questions.length}`);
 
     const to = sendTo || "alexandre.grigoriev@horiba.com";
-    const subject = encodeURIComponent(`Quiz Results — ${presentationName}`);
-    const body = encodeURIComponent(lines.join("\n"));
-    window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");
+    await fetch("/api/quiz/send-results", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to,
+        subject: `Quiz Results — ${presentationName}`,
+        text: lines.join("\n"),
+      }),
+    });
     setSubmitted(true);
   };
 
@@ -1032,6 +1253,7 @@ function ChatPanel({
   presentationContent,
   presentationName,
   userName,
+  userEmail,
   onStartPresentation,
   onContinuePresentation,
   onSwitchToChat,
@@ -1046,6 +1268,7 @@ function ChatPanel({
   presentationContent: string;
   presentationName: string;
   userName?: string;
+  userEmail?: string;
   onStartPresentation: (name: string) => void;
   onContinuePresentation: () => void;
   onSwitchToChat: () => void;
@@ -1162,7 +1385,7 @@ function ChatPanel({
 
       <div className="rightBody">
         {panelMode === "quiz" ? (
-          <QuizWidget presentationContent={presentationContent} presentationName={presentationName} lang={lang} userName={userName} />
+          <QuizWidget presentationContent={presentationContent} presentationName={presentationName} lang={lang} userName={userName} userEmail={userEmail} />
         ) : (
           <>
             <div className="chatScroll" ref={scrollRef}>
@@ -1254,6 +1477,7 @@ export default function App() {
   const mainGridRef = useRef<HTMLElement>(null);
 
   const [presentationDialogOpen, setPresentationDialogOpen] = useState(false);
+  const [quizGenDialog, setQuizGenDialog] = useState<{ presName: string; presLang: string } | null>(null);
   const [activePresentationName, setActivePresentationName] = useState<string | null>(null);
   const [activePresentationLabel, setActivePresentationLabel] = useState("No presentation selected");
 
@@ -1653,6 +1877,7 @@ export default function App() {
           presentationContent={presentationContent}
           presentationName={activePresentationName ?? ""}
           userName={user?.name ?? user?.email}
+          userEmail={user?.email}
           onStartPresentation={handleStartPresentation}
           onContinuePresentation={handleContinuePresentation}
           onSwitchToChat={() => handleViewChange("chat")}
@@ -1661,12 +1886,22 @@ export default function App() {
 
       <div className="footerNote">HORIBA FRANCE 2026. ALL RIGHTS RESERVED</div>
 
+      {quizGenDialog && (
+        <QuizGenerationDialog
+          presName={quizGenDialog.presName}
+          presLang={quizGenDialog.presLang}
+          onClose={() => setQuizGenDialog(null)}
+          onQuizSaved={() => { setQuizGenDialog(null); loadPresentation(quizGenDialog.presName); }}
+        />
+      )}
+
       <PresentationDialog
         open={presentationDialogOpen}
         onClose={() => {
           setPresentationDialogOpen(false);
           if (!activePresentationName) setView("chat");
         }}
+        onQuizReady={(presName, presLang) => setQuizGenDialog({ presName, presLang })}
         defaultLang={lang}
         presentations={presentations}
         isAdmin={user?.role === "admin"}

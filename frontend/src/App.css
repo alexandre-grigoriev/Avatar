@@ -796,7 +796,8 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   color: #fff;
   cursor: pointer;
 }
-.presSubmitBtn:hover{ background: #5b9bda; }
+.presSubmitBtn:hover:not(:disabled){ background: #5b9bda; }
+.presSubmitBtn:disabled{ opacity: 0.4; cursor: not-allowed; }
 
 /* quiz */
 .quizWrap{ display:flex; flex-direction:column; gap: 10px; }
