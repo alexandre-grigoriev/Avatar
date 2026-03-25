@@ -11,6 +11,7 @@ export interface Presentation {
   name: string;
   description: string;
   language: string;
+  createdBy?: string;
 }
 
 export type IntentType =
@@ -27,7 +28,7 @@ export interface Intent {
 
 /** Summarize a slide image (base64 JPEG) in the given language */
 export async function summarizeSlideImage(base64: string, language: string): Promise<string> {
-  const langName = { english: "English", french: "French", arabic: "Arabic" }[language] ?? "English";
+  const langName = { english: "English", french: "French", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian" }[language] ?? "English";
   const body = {
     contents: [{
       parts: [
@@ -43,7 +44,7 @@ Rules:
 - IGNORE completely: copyright notices, legal mentions, company branding, dates
 - IGNORE completely: slide numbers or titles that are just section headers with no content
 - If the slide is only a title or transition slide with no real content, write a single short sentence introducing the topic
-- If the slide is a closing/thank-you slide (contains words like "thank you", "merci", "شكراً", "gracias", "danke", or similar in any language, or shows appreciation symbols), output ONLY a single closing sentence in ${langName} thanking the audience for their attention — nothing else
+- If the slide is a closing/thank-you slide (contains words like "thank you", "merci", "شكراً", "gracias", "danke", "ありがとう", "ありがとうございます", "谢谢", "感谢", "спасибо", or similar in any language, or shows appreciation symbols), output ONLY a single closing sentence in ${langName} thanking the audience for their attention — nothing else
 - Do NOT say "this slide shows" or "we can see" — speak directly as the narrator` },
       ],
     }],
@@ -123,7 +124,7 @@ export async function generateQuizQuestions(
   lang: string,
   count = 5
 ): Promise<QuizQuestion[]> {
-  const langName = { en: "English", fr: "French", ar: "Arabic" }[lang] ?? "English";
+  const langName = { en: "English", fr: "French", ar: "Arabic", ja: "Japanese", zh: "Chinese", ru: "Russian" }[lang] ?? "English";
   const prompt = `You are a quiz generator. Based on the following presentation content, generate exactly ${count} multiple-choice questions in ${langName}.
 
 Presentation content:
@@ -162,7 +163,7 @@ export async function translateQuizQuestions(
   questions: QuizQuestion[],
   lang: string
 ): Promise<QuizQuestion[]> {
-  const langName = { en: "English", fr: "French", ar: "Arabic" }[lang] ?? "English";
+  const langName = { en: "English", fr: "French", ar: "Arabic", ja: "Japanese", zh: "Chinese", ru: "Russian" }[lang] ?? "English";
 
   // Only send translatable text; keep structural fields (correct, type, ids) intact
   const texts = questions.map((q) => ({
@@ -203,7 +204,7 @@ export async function generateQuizFile(
   lang: string,
   count: number
 ): Promise<QuizFileQuestion[]> {
-  const langName = { english: "English", french: "French", arabic: "Arabic" }[lang] ?? "English";
+  const langName = { english: "English", french: "French", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian" }[lang] ?? "English";
   const prompt = `Generate exactly ${count} multiple-choice quiz questions in ${langName} based on this presentation content.
 
 Presentation content:
@@ -230,21 +231,119 @@ Format:
   return [];
 }
 
+/** Translate quiz questions in the question.json file format (choices[] / correctAnswers[]) */
+export async function translateQuizFileQuestions(
+  questions: QuizFileQuestion[],
+  toLang: string
+): Promise<QuizFileQuestion[]> {
+  const LANG_NAMES: Record<string, string> = {
+    english: "English", french: "French", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian",
+    en: "English", fr: "French", ar: "Arabic", ja: "Japanese", zh: "Chinese", ru: "Russian",
+  };
+  const tgt = LANG_NAMES[toLang] ?? toLang;
+  const texts = questions.map(q => ({ q: q.question, c: q.choices }));
+  const prompt = `Translate to ${tgt}. Reply ONLY with a JSON array, no markdown. Keep structure with fields "q" (string) and "c" (array of strings).\n\n${JSON.stringify(texts)}`;
+  try {
+    const result = await callGemini(prompt);
+    const match = result.match(/\[[\s\S]*\]/);
+    if (match) {
+      const translated: Array<{ q: string; c: string[] }> = JSON.parse(match[0]);
+      return questions.map((q, i) => ({
+        ...q,
+        question: translated[i]?.q ?? q.question,
+        choices: q.choices.map((ch, j) => translated[i]?.c?.[j] ?? ch),
+      }));
+    }
+  } catch {}
+  return questions;
+}
+
+/** Translate a full slide content file from one language to another */
+export async function translateContent(content: string, fromLang: string, toLang: string): Promise<string> {
+  const LANG_NAMES: Record<string, string> = {
+    english: "English", french: "French", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian",
+    en: "English", fr: "French", ar: "Arabic", ja: "Japanese", zh: "Chinese", ru: "Russian",
+  };
+  const src = LANG_NAMES[fromLang] ?? fromLang;
+  const tgt = LANG_NAMES[toLang] ?? toLang;
+  const SLIDE_SEP = "<<<SLIDE>>>";
+
+  const rawBlocks = content.split("-------").map(b => b.trim()).filter(Boolean);
+  if (!rawBlocks.length) return content;
+
+  const textParts: string[] = [];
+  const structLines: string[] = [];
+  for (const block of rawBlocks) {
+    const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    const image = lines.find(l => l.startsWith("image:")) ?? "";
+    const quiz  = lines.find(l => /^quiz:/i.test(l)) ?? "";
+    const text  = lines.filter(l => !l.startsWith("image:") && !/^quiz:/i.test(l)).join("\n");
+    textParts.push(text || "");
+    structLines.push([image, quiz].filter(Boolean).join("\n"));
+  }
+
+  const combined = textParts.join(`\n${SLIDE_SEP}\n`);
+  const prompt = `Translate these presentation slide texts from ${src} to ${tgt}.
+Slides are separated by "${SLIDE_SEP}". Return ONLY the translated slides in the same order, separated by "${SLIDE_SEP}".
+Keep "No slide notes" untranslated. No explanations or extra text.
+
+${combined}`;
+
+  try {
+    const result = await callGemini(prompt);
+    const translated = result.split(SLIDE_SEP).map(s => s.trim());
+    return rawBlocks.map((_, i) => {
+      const text   = translated[i] ?? textParts[i];
+      const struct = structLines[i];
+      return [text, struct].filter(Boolean).join("\n");
+    }).join("\n-------\n");
+  } catch {
+    return content;
+  }
+}
+
+/** Fetch relevant knowledge base chunks for a query (Graph RAG retrieval) */
+async function fetchKnowledgeBaseContext(message: string, lang: string): Promise<string> {
+  try {
+    const res = await fetch("/api/knowledge-base/search", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: message, lang }),
+    });
+    if (!res.ok) return "";
+    const data = await res.json();
+    if (!Array.isArray(data.chunks) || !data.chunks.length) return "";
+    return data.chunks.map((c: string, i: number) => `[${i + 1}] ${c}`).join("\n---\n");
+  } catch {
+    return "";
+  }
+}
+
 /** Send a message to Gemini and return the AI response */
 export async function sendToGemini(
   message: string,
   history: ChatMessage[],
   presentations: Presentation[],
-  presentationContent: string
+  presentationContent: string,
+  lang = "fr"
 ): Promise<string> {
   const pList = presentations
     .map((p) => `• ${p.name} (${p.language}): ${p.description}`)
     .join("\n");
 
+  // Fetch knowledge base context in parallel with building the prompt
+  const kbContext = await fetchKnowledgeBaseContext(message, lang);
+
   let system = "You are a smart assistant for HORIBA. Be concise and helpful.\n";
   if (pList) system += `Available presentations:\n${pList}\n`;
   if (presentationContent)
     system += `Current presentation content:\n${presentationContent}\n`;
+  if (kbContext) {
+    system += `\nKnowledge base context (HR documents — use this as primary source):\n${kbContext}\n`;
+    system += "If the answer is in the knowledge base context, base your answer strictly on it. ";
+    system += "If not found, say so clearly rather than guessing.\n";
+  }
   system += "Answer only based on the provided context.\n\n";
 
   const conv = [...history, { role: "user" as const, text: message }]

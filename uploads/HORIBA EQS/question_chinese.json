@@ -1,0 +1,115 @@
+{
+  "questions": [
+    {
+      "question": "堀场EQS的主要目的是什么？",
+      "type": "single",
+      "choices": [
+        "制造汽车零部件",
+        "环境与质量解决方案",
+        "电动汽车充电系统",
+        "软件开发工具"
+      ],
+      "correctAnswers": [
+        1
+      ]
+    },
+    {
+      "question": "堀场EQS服务于哪些行业？ (多选)",
+      "type": "multiple",
+      "choices": [
+        "汽车",
+        "环境监测",
+        "医疗保健",
+        "游戏行业"
+      ],
+      "correctAnswers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "question": "堀场EQS专注于哪种类型的测量？",
+      "type": "single",
+      "choices": [
+        "财务分析",
+        "排放物和环境质量",
+        "社交媒体指标",
+        "建筑施工"
+      ],
+      "correctAnswers": [
+        1
+      ]
+    },
+    {
+      "question": "哪些技术是堀场EQS解决方案的一部分？ (多选)",
+      "type": "multiple",
+      "choices": [
+        "气体分析仪",
+        "颗粒物测量系统",
+        "水质分析仪",
+        "视频游戏机"
+      ],
+      "correctAnswers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "question": "堀场的主要承诺是什么？",
+      "type": "single",
+      "choices": [
+        "仅追求利润最大化",
+        "环境保护和质量保证",
+        "市场主导地位",
+        "社交媒体影响力"
+      ],
+      "correctAnswers": [
+        1
+      ]
+    },
+    {
+      "question": "堀场法国位于哪个国家？",
+      "type": "single",
+      "choices": [
+        "德国",
+        "意大利",
+        "法国",
+        "西班牙"
+      ],
+      "correctAnswers": [
+        2
+      ]
+    },
+    {
+      "question": "堀场EQS解决方案的主要优势是什么？ (多选)",
+      "type": "multiple",
+      "choices": [
+        "符合法规",
+        "精确测量",
+        "实时监测",
+        "免费娱乐"
+      ],
+      "correctAnswers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "question": "堀场帮助测量哪些排放标准？",
+      "type": "single",
+      "choices": [
+        "仅欧洲标准",
+        "全球排放标准 (如EURO、EPA等)",
+        "仅亚洲标准",
+        "无特定标准"
+      ],
+      "correctAnswers": [
+        1
+      ]
+    }
+  ],
+  "sendto": "alexandre.grigoriev@horiba.com"
+}

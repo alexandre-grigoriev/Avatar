@@ -4,6 +4,9 @@ const LANG_MAP: Record<string, string> = {
   en: "en-US",
   fr: "fr-FR",
   ar: "ar-SA",
+  ja: "ja-JP",
+  zh: "zh-CN",
+  ru: "ru-RU",
 };
 
 export function useSpeechRecognition(lang: string) {

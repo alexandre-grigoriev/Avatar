@@ -4,14 +4,20 @@ const TTS_API_KEY = import.meta.env.VITE_TTS_API_KEY ?? "AIzaSyB4xEOzhBfuIO33fha
 
 const AVATAR_CONFIG: Record<string, Record<string, { url: string; ttsLang: string; ttsVoice: string; lipsyncLang: string }>> = {
   alan: {
-    en: { url: "/TalkingHead/avatars/men.glb",   ttsLang: "en-GB", ttsVoice: "en-GB-Standard-B", lipsyncLang: "en" },
-    fr: { url: "/TalkingHead/avatars/men.glb",   ttsLang: "fr-FR", ttsVoice: "fr-FR-Standard-B", lipsyncLang: "fr" },
-    ar: { url: "/TalkingHead/avatars/men.glb",   ttsLang: "ar-XA", ttsVoice: "ar-XA-Wavenet-C",  lipsyncLang: "ar" },
+    en: { url: "/talking_heads/avatars/men.glb",   ttsLang: "en-GB", ttsVoice: "en-GB-Standard-B", lipsyncLang: "en" },
+    fr: { url: "/talking_heads/avatars/men.glb",   ttsLang: "fr-FR", ttsVoice: "fr-FR-Standard-B", lipsyncLang: "fr" },
+    ar: { url: "/talking_heads/avatars/men.glb",   ttsLang: "ar-XA", ttsVoice: "ar-XA-Wavenet-C",  lipsyncLang: "ar" },
+    ja: { url: "/talking_heads/avatars/men.glb",   ttsLang: "ja-JP", ttsVoice: "ja-JP-Standard-C", lipsyncLang: "ja" },
+    zh: { url: "/talking_heads/avatars/men.glb",   ttsLang: "cmn-CN", ttsVoice: "cmn-CN-Wavenet-B", lipsyncLang: "zh" },
+    ru: { url: "/talking_heads/avatars/men.glb",   ttsLang: "ru-RU", ttsVoice: "ru-RU-Standard-B", lipsyncLang: "ru" },
   },
   ada: {
-    en: { url: "/TalkingHead/avatars/women.glb", ttsLang: "en-GB", ttsVoice: "en-GB-Standard-A", lipsyncLang: "en" },
-    fr: { url: "/TalkingHead/avatars/women.glb", ttsLang: "fr-FR", ttsVoice: "fr-FR-Standard-A", lipsyncLang: "fr" },
-    ar: { url: "/TalkingHead/avatars/women.glb", ttsLang: "ar-XA", ttsVoice: "ar-XA-Standard-A", lipsyncLang: "ar" },
+    en: { url: "/talking_heads/avatars/women.glb", ttsLang: "en-GB", ttsVoice: "en-GB-Standard-A", lipsyncLang: "en" },
+    fr: { url: "/talking_heads/avatars/women.glb", ttsLang: "fr-FR", ttsVoice: "fr-FR-Standard-A", lipsyncLang: "fr" },
+    ar: { url: "/talking_heads/avatars/women.glb", ttsLang: "ar-XA", ttsVoice: "ar-XA-Standard-A", lipsyncLang: "ar" },
+    ja: { url: "/talking_heads/avatars/women.glb", ttsLang: "ja-JP", ttsVoice: "ja-JP-Standard-A", lipsyncLang: "ja" },
+    zh: { url: "/talking_heads/avatars/women.glb", ttsLang: "cmn-CN", ttsVoice: "cmn-CN-Wavenet-A", lipsyncLang: "zh" },
+    ru: { url: "/talking_heads/avatars/women.glb", ttsLang: "ru-RU", ttsVoice: "ru-RU-Standard-A", lipsyncLang: "ru" },
   },
 };
 
@@ -31,7 +37,7 @@ function loadTalkingHead(): Promise<any> {
     script.type = "module";
     script.textContent = `
       try {
-        const { TalkingHead } = await import("/TalkingHead/modules/talkinghead.mjs");
+        const { TalkingHead } = await import("/talking_heads/modules/talkinghead.mjs");
         window["${GLOBAL_KEY}"] = TalkingHead;
         window.dispatchEvent(new CustomEvent("${GLOBAL_KEY}:ready"));
       } catch (e) {
