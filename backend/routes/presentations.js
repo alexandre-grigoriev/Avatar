@@ -238,6 +238,21 @@ router.put("/api/presentations/:name/quiz/:lang", requireAuth, requireContributo
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.delete("/api/presentations/:name", requireAuth, requireContributor, async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const presDir = path.join(UPLOADS_DIR, name);
+  const filesData = readFilesJson();
+  const entry = filesData.files.find(f => f.name === name);
+  if (!entry) return res.status(404).json({ error: "Not found in registry" });
+  if (req.session.user.role !== "admin" && entry.createdBy !== req.session.user.id) return res.status(403).json({ error: "Not authorized" });
+  try {
+    if (fs.existsSync(presDir)) fs.rmSync(presDir, { recursive: true, force: true });
+    filesData.files = filesData.files.filter(f => f.name !== name);
+    writeFilesJson(filesData);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.delete("/api/presentations/:name/language/:lang", requireAuth, requireContributor, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const lang = req.params.lang;

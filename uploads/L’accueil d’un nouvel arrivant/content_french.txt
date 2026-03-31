@@ -1,0 +1,188 @@
+Bonjour et Bienvenu chez Horiba France
+Je suis l'intelligence Artificiel chargé de vous former sur la sécurité et l’environnement.
+image:slide_001.png
+-------
+Cette formation a pour objectif de donner à chaque nouvel arrivant les bases essentielles en matière de sécurité et d’environnement chez HORIBA. Elle permet de comprendre les règles à respecter pour travailler dans un environnement sûr, conforme et maîtrisé.
+Elle s’applique à tous, quel que soit le poste, et constitue un socle commun indispensable. L’objectif est que chacun soit capable d’identifier les situations à risque, de réagir correctement et de contribuer à la prévention des incidents.
+Enfin, cette formation s’inscrit dans le cadre légal et dans la culture sécurité de l’entreprise, basée sur la vigilance, la responsabilité collective et l’amélioration continue.
+image:slide_002.png
+-------
+Horaires de travail
+Les horaires sont structurés de 9h00 à 17h00Objectif : garantir que tout le monde soit présent en même temps
+Accès et badge
+Le badge est obligatoire pour : 
+entrer et sortir 
+les évacuations (sécurité incendie) 
+Important : prêter ou perdre son badge = non conforme 
+le badge permet aussi de savoir qui est présent sur le site (sécurité) 
+Zones restreintes & prévention
+Certaines zones sont interdites sans autorisation : 
+production 
+R&D 
+zones techniques 
+C’est fait pour :
+protéger les activités sensibles 
+éviter les accidents 
+protéger les données/confidentialité 
+
+4. Interdiction de filmer / photographier
+Très important : il est interdit de filmer ou prendre des photos sans autorisation.
+Toutes les informations internes sont confidentielles.
+Donc interdit :
+partager des infos à l’extérieur 
+prendre des photos de machines, écrans, labo, etc. 
+Données personnelles
+Interdiction de transférer des données personnelles sans autorisation 
+Par exemple : fichiers employés ou données clients 
+
+Accès aux zones
+L’accès est strictement limité aux personnes autorisées 
+Cela concerne :
+magasins 
+zones de fabrication 
+laboratoires 
+locaux techniques
+image:slide_003.png
+-------
+Cette partie concerne la santé et la sécurité au travail. 
+Dès votre arrivée, votre responsable va vous présenter les sauveteurs secouristes du travail, vous expliquer leur rôle et vous montrer où se trouvent les équipements essentiels.
+
+Il est important de savoir localiser plusieurs éléments clés : les extincteurs, les issues de secours et les points de rassemblement, afin de pouvoir réagir rapidement en cas d’urgence. 
+Vous devez également repérer les équipements de protection, qu’ils soient individuels ou collectifs, ainsi que les arrêts d’urgence sur les installations. 
+Enfin, il est essentiel de connaître l’emplacement des dispositifs de secours, comme les douches de sécurité, les rince-œil et les défibrillateurs.
+
+Au quotidien, certaines règles doivent être strictement respectées. 
+Il est interdit de fumer ou de vapoter à l’intérieur des locaux, afin de prévenir les risques d’incendie et de protéger la santé de tous. 
+Les couloirs, escaliers et issues de secours doivent toujours rester dégagés pour garantir une évacuation rapide en cas de besoin.
+Il est également nécessaire de respecter les règles de circulation sur le site, notamment les limitations de vitesse et les sens de circulation. 
+Enfin, le stationnement en position dite « départ » permet de faciliter une évacuation rapide des véhicules si la situation l’exige.
+
+L’ensemble de ces règles vise à garantir la sécurité de chacun et à permettre une réaction efficace en cas d’incident.
+image:slide_004.png
+-------
+Les consignes d’évacuation ont pour objectif d’assurer une mise en sécurité rapide et organisée de toutes les personnes présentes sur le site.
+En cas d’évacuation, il faut utiliser l’issue de secours la plus proche et rejoindre le point de rassemblement sans courir, afin d’éviter tout mouvement de panique. 
+Il est important de suivre les consignes des personnes en charge de l’évacuation, comme les guide-files, serre-files ou chargés d’évacuation.
+
+Il est strictement interdit d’utiliser les ascenseurs ou les monte-charges pendant une évacuation. 
+Avant de rejoindre le point de rassemblement, il faut badger à la borne de comptage extérieure, afin de permettre de vérifier que toutes les personnes ont bien évacué.
+Une fois au point de rassemblement, il est essentiel de se regrouper par équipe pour faciliter le contrôle des effectifs.
+
+Ces consignes permettent de garantir une évacuation efficace, sécurisée et maîtrisée en cas d’urgence.
+image:slide_005.png
+-------
+En cas de danger grave et imminent, il est essentiel de le signaler immédiatement pour prévenir tout accident.
+Si vous êtes victime ou témoin d’un accident dans l’entreprise, vous devez réagir rapidement. 
+
+La première chose à faire est de contacter un Sauveteur Secouriste du Travail, ou à défaut le service des Ressources Humaines.
+Si personne n’est disponible, vous devez appeler directement :
+le standard au 2001 
+ou les Services Généraux au 7287 
+
+En cas d’urgence grave, il faut contacter les secours :
+le SAMU au 015 
+ou le numéro d’urgence européen 112 
+
+Par ailleurs, chaque poste de travail comporte des risques spécifiques. 
+Votre responsable ou tuteur vous présentera ces risques en s’appuyant sur le document unique et les fiches de risques associées.
+L’objectif est que chacun soit capable d’identifier les dangers et de réagir rapidement et efficacement en cas de situation d’urgence.
+image:slide_006.png
+-------
+En cas de danger grave et imminent, de manquement ou de situation de malversation, il est important d’alerter immédiatement les référents concernés.
+Si vous êtes victime ou témoin d’un fait grave, dangereux ou potentiellement illégal, vous devez suivre la procédure d’alerte interne. 
+
+Vous pouvez contacter :
+l’assistante de direction, Lucie LE STUNFF 
+la référente harcèlement CSE, Alessia QUATELA 
+ou la référente harcèlement RH, Soline PICHOT 
+
+Par ailleurs, tout danger grave et imminent doit également être signalé par écrit dans le registre dédié.
+Selon le site, les interlocuteurs sont :
+à Palaiseau : Lucie LE STUNFF 
+à Loos : Xavier PETIT, directeur de production 
+à Vénissieux : Kevin CADORET, responsable du site 
+
+L’objectif de ce dispositif est de permettre une remontée rapide des situations à risque et d’assurer la sécurité ainsi que le respect des règles au sein de l’entreprise.
+image:slide_007.png
+-------
+Les équipements de protection individuelle servent à protéger les différentes parties du corps en fonction des risques présents au poste de travail.
+
+Les vêtements de protection, comme les blouses ou les combinaisons, permettent de se protéger contre les projections, les salissures et certains risques liés aux produits manipulés.
+
+Les chaussures de sécurité sont conçues pour protéger les pieds, notamment contre les chutes d’objets, les écrasements ou les risques de glissade.
+
+Les gants de protection sont utilisés lors de la manipulation de produits dangereux ou d’objets, afin d’éviter les coupures, les brûlures ou le contact avec des substances nocives.
+
+Les lunettes ou visières de protection servent à protéger les yeux et le visage, en particulier lors de manipulations de produits, de transvasements ou lors de l’utilisation d’équipements comme les lasers.
+
+Les masques de protection respiratoire sont nécessaires dans certaines situations pour éviter l’inhalation de poussières, de vapeurs ou de produits chimiques dangereux.
+
+Enfin, les protections auditives, comme les casques ou les bouchons, permettent de se protéger contre le bruit et de prévenir les risques de perte auditive.
+
+L’ensemble de ces équipements doit être utilisé en fonction des risques identifiés pour garantir la sécurité de chacun.
+image:slide_008.png
+-------
+Ce slide présente les principaux pictogrammes de danger que vous pouvez rencontrer sur le site, et qu’il est essentiel de savoir reconnaître.
+
+On retrouve d’abord les risques liés aux rayonnements, notamment le laser et les rayonnements optiques. 
+Ces zones nécessitent une vigilance particulière, avec un accès souvent limité, car ces rayonnements peuvent être dangereux pour les yeux et la peau.
+
+Il existe également des risques d’atmosphère explosive. 
+Dans ces zones, il est interdit d’utiliser son téléphone portable ou de fumer, et il faut faire attention aux charges électrostatiques qui peuvent provoquer une étincelle.
+
+Le risque électrique est aussi important : il ne faut jamais intervenir sur une installation sans habilitation, car cela peut entraîner des accidents graves.
+
+Certains environnements peuvent présenter un risque d’anoxie, c’est-à-dire un manque d’oxygène. 
+Si une alarme se déclenche, il faut immédiatement évacuer la zone.
+
+On peut également rencontrer des risques liés aux rayonnements ionisants, qui nécessitent des précautions spécifiques.
+
+D’autres pictogrammes indiquent des dangers plus mécaniques ou physiques, comme les surfaces chaudes pouvant provoquer des brûlures, les champs magnétiques qui peuvent être dangereux notamment pour les personnes portant des dispositifs médicaux, ou encore les risques d’écrasement liés au mouvement de certaines pièces d’équipements.
+
+L’objectif est de pouvoir identifier rapidement ces dangers et d’adopter le bon comportement pour garantir sa sécurité et celle des autres.
+image:slide_009.png
+-------
+Ce slide présente les principaux pictogrammes associés aux produits chimiques et les précautions à respecter.
+
+Certains produits peuvent être irritants ou nocifs. 
+Dans ce cas, il faut éviter tout contact avec la peau et les yeux, et ne pas respirer les vapeurs.
+
+D’autres produits sont plus dangereux, notamment toxiques ou dangereux pour la santé. 
+Les mêmes précautions s’appliquent, avec une vigilance renforcée sur l’exposition.
+
+Les produits corrosifs nécessitent une attention particulière : ils peuvent attaquer la peau, les yeux et même les vêtements. 
+Il est donc essentiel d’éviter tout contact direct.
+
+Certains produits présentent des risques physiques, comme les produits explosifs ou sous pression. 
+Il faut éviter les chocs, les frottements et toute source de chaleur.
+
+On retrouve aussi des produits inflammables. 
+Ils doivent être tenus éloignés de toute flamme ou étincelle, et les flacons doivent être bien refermés après utilisation.
+
+Les produits comburants, quant à eux, favorisent la combustion. 
+Ils doivent être maintenus à distance des matières inflammables.
+
+Enfin, certains produits sont dangereux pour l’environnement. 
+Leur utilisation doit être maîtrisée, et leur élimination doit se faire via les filières de déchets toxiques.
+
+L’objectif est de reconnaître rapidement ces pictogrammes pour adopter les bons gestes et manipuler les produits en toute sécurité.
+image:slide_010.png
+-------
+Cette partie concerne les fondamentaux qualité au sein de l’entreprise.
+Votre responsable ou tuteur vous présentera d’abord la politique EQS, qui couvre l’environnement, la qualité et la sécurité. Il vous expliquera également les certifications de l’entreprise, notamment les normes ISO 9001 et ISO 14001, ainsi que les processus, les indicateurs et les objectifs liés à votre activité.
+
+Vous serez aussi formé aux outils essentiels, comme le système documentaire Lotus, la base de métrologie et la base Blackjack. 
+Des consignes spécifiques vous seront également présentées, notamment celles liées à l’ESD pour la manipulation de composants sensibles.
+
+Au quotidien, certaines règles doivent être respectées. 
+À chaque utilisation, il est important de vérifier que les documents sont à la bonne version, car seules les versions présentes dans le système documentaire font foi.
+
+Il faut également s’assurer que les instruments et outillages ont bien été contrôlés dans les délais, et que les produits utilisés ne sont pas périmés.
+
+L’objectif est de garantir la fiabilité des opérations, la conformité des résultats et le respect des exigences qualité.
+image:slide_011.png
+-------
+Je vous remercie pour votre attention et je reste à votre disposition pour toute question
+image:slide_012.png
+-------
+quiz:YES

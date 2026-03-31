@@ -138,7 +138,7 @@ export function AddPdfDialog({ open, onClose }: { open: boolean; onClose: () => 
                         <div style={{ fontSize: 14, color: "#374151" }}>
                           Reset will permanently delete all documents and their chunks from the knowledge base.
                         </div>
-                        <button className="presSubmitBtn" style={{ background: "#ef4444", alignSelf: "flex-start" }}
+                        <button className="presSubmitBtn" style={{ alignSelf: "flex-start" }}
                           onClick={() => setResetConfirm(true)}>
                           Reset knowledge base
                         </button>
@@ -149,7 +149,7 @@ export function AddPdfDialog({ open, onClose }: { open: boolean; onClose: () => 
                           Do you really want to reset the knowledge base? All documents will be lost!
                         </div>
                         <div style={{ display: "flex", gap: 10 }}>
-                          <button className="presSubmitBtn" style={{ background: "#ef4444" }} disabled={resetting}
+                          <button className="presSubmitBtn" disabled={resetting}
                             onClick={doReset}>
                             {resetting ? "Resetting…" : "Yes, delete all"}
                           </button>

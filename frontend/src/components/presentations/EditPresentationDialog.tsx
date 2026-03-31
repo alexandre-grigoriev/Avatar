@@ -50,13 +50,26 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
   const [savedMeta, setSavedMeta] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // userRole and defaultLang are available for future use
   void userRole; void defaultLang;
 
+  async function doDelete() {
+    if (!selected) return;
+    setDeleting(true); setError("");
+    try {
+      const res = await fetch(`/api/presentations/${encodeURIComponent(selected.name)}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? "Delete failed"); }
+      onClose();
+    } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); }
+    finally { setDeleting(false); setDeleteConfirm(false); }
+  }
+
   useEffect(() => {
     if (open) {
-      setStep("select"); setError(""); setAddLangOpen(false); setSelected(null);
+      setStep("select"); setError(""); setAddLangOpen(false); setSelected(null); setDeleteConfirm(false);
       fetch("/api/my-presentations", { credentials: "include" })
         .then(r => r.json()).then((data: Presentation[]) => { setMyPres(data); if (data.length) setSelected(data[0]); }).catch(() => {});
     }
@@ -219,20 +232,34 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
                 )}
               </div>
               {selected && (
+                <>
+                <div className="presFieldLabel" style={{ marginTop: 12, marginBottom: 6 }}>Details</div>
                 <div className="presPreviewCard">
                   <div className="presPreviewTitle">{selected.name}</div>
                   <div className="presPreviewDesc">{selected.description}</div>
                   <div className="presPreviewLang">Language: {selected.language.toUpperCase()}</div>
                 </div>
+                </>
               )}
             </div>
-            <div className="presFooter">
-              <button className="presCancelBtn" onClick={onClose}>Cancel</button>
-              <button className="presSubmitBtn" disabled={!selected}
-                onClick={() => { if (selected) selectPres(selected); }}>
-                Edit
-              </button>
-            </div>
+            {error && <div className="authError" style={{ marginTop: 8, marginLeft: 16, marginRight: 16 }}>{error}</div>}
+            {deleteConfirm ? (
+              <div className="presFooter" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>Delete "{selected?.name}"? All data will be lost!</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button className="presSubmitBtn" disabled={deleting} onClick={doDelete}>
+                    {deleting ? "Deleting…" : "Yes, delete"}
+                  </button>
+                  <button className="presCancelBtn" onClick={() => setDeleteConfirm(false)}>No, cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="presFooter">
+                <button className="presSubmitBtn" disabled={!selected} onClick={() => { if (selected) selectPres(selected); }}>Edit</button>
+                <button className="presSubmitBtn" disabled={!selected} onClick={() => setDeleteConfirm(true)}>Delete</button>
+                <button className="presCancelBtn" onClick={onClose}>Cancel</button>
+              </div>
+            )}
           </>
         ) : selected ? (
           <>

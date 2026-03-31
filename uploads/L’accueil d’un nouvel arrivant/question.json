@@ -1,0 +1,117 @@
+{
+  "sendto": "alexandre.grigoriev@horiba.com",
+  "questions": [
+    {
+      "question": "Quel est l'objectif principal de cette formation sur la sécurité et l'environnement chez Horiba France ?",
+      "type": "single",
+      "choices": [
+        "Former les nouveaux arrivants aux techniques de vente.",
+        "Permettre à chacun d'identifier les situations à risque, de réagir correctement et de contribuer à la prévention.",
+        "Enseigner l'utilisation de tous les logiciels internes de l'entreprise.",
+        "Réduire les horaires de travail de tous les employés."
+      ],
+      "correctAnswers": [
+        1
+      ]
+    },
+    {
+      "question": "Pour quelles raisons principales le badge est-il obligatoire chez Horiba France ?",
+      "type": "multiple",
+      "choices": [
+        "Pour entrer et sortir du site.",
+        "Pour valider ses achats à la cafétéria.",
+        "Pour permettre de savoir qui est présent sur le site (sécurité).",
+        "Pour accéder à toutes les zones, y compris la R&D sans autorisation."
+      ],
+      "correctAnswers": [
+        0,
+        2
+      ]
+    },
+    {
+      "question": "Parmi les zones suivantes, lesquelles sont généralement restreintes et nécessitent une autorisation spécifique ?",
+      "type": "multiple",
+      "choices": [
+        "Les bureaux administratifs standards.",
+        "Les zones de production.",
+        "Les laboratoires (R&D).",
+        "Les locaux techniques."
+      ],
+      "correctAnswers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "question": "Quelles sont les règles importantes à respecter au quotidien concernant la santé et la sécurité au travail ?",
+      "type": "multiple",
+      "choices": [
+        "Fumer ou vapoter est autorisé uniquement dans les bureaux personnels.",
+        "Les couloirs, escaliers et issues de secours doivent toujours rester dégagés.",
+        "Respecter les règles de circulation sur le site, notamment les limitations de vitesse.",
+        "Le stationnement des véhicules doit se faire en position dite « départ »."
+      ],
+      "correctAnswers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "question": "En cas d'évacuation du site, quelles actions sont conformes aux consignes ?",
+      "type": "multiple",
+      "choices": [
+        "Courir vers la sortie la plus proche pour éviter la panique.",
+        "Utiliser l'issue de secours la plus proche et suivre les consignes.",
+        "Badger à la borne de comptage extérieure avant de rejoindre le point de rassemblement.",
+        "Utiliser les ascenseurs pour une évacuation rapide si l'on est à l'étage."
+      ],
+      "correctAnswers": [
+        1,
+        2
+      ]
+    },
+    {
+      "question": "Si vous êtes victime ou témoin d'un accident dans l'entreprise, qui devez-vous contacter en première intention ?",
+      "type": "single",
+      "choices": [
+        "Le SAMU directement.",
+        "Un Sauveteur Secouriste du Travail ou, à défaut, le service des Ressources Humaines.",
+        "Les Services Généraux au 7287.",
+        "L'assistante de direction, Lucie LE STUNFF."
+      ],
+      "correctAnswers": [
+        1
+      ]
+    },
+    {
+      "question": "Selon la présentation, à quoi servent les équipements de protection individuelle (EPI) ?",
+      "type": "multiple",
+      "choices": [
+        "À décorer les postes de travail.",
+        "À protéger les pieds contre les chutes d'objets (chaussures de sécurité).",
+        "À protéger les yeux et le visage lors de manipulations (lunettes/visières).",
+        "À protéger contre le bruit et prévenir la perte auditive (protections auditives)."
+      ],
+      "correctAnswers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "question": "Quel type de danger est signalé par un pictogramme qui interdit l'utilisation de téléphones portables ou de fumer ?",
+      "type": "single",
+      "choices": [
+        "Risque électrique.",
+        "Risque d'anoxie.",
+        "Risque d'atmosphère explosive.",
+        "Risque de champs magnétiques."
+      ],
+      "correctAnswers": [
+        2
+      ]
+    }
+  ]
+}

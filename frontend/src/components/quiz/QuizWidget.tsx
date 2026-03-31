@@ -129,7 +129,7 @@ export function QuizWidget({
   if (submitted) return (
     <div className="quizWrap" style={{ alignItems: "center", justifyContent: "center", display: "flex", flex: 1 }}>
       <div style={{ color: "#111827", fontSize: 14, textAlign: "center", padding: "0 24px", lineHeight: 1.6 }}>
-        <CheckCircle2 className="h-8 w-8 text-green-600" style={{ margin: "0 auto 12px" }} />
+        <CheckCircle2 className="h-6 w-6 text-green-600" style={{ margin: "0 auto 12px" }} />
         Results sent! Thank you for completing the quiz.
       </div>
     </div>
@@ -168,9 +168,9 @@ export function QuizWidget({
                 <div className="flex items-center justify-between">
                   <div className="text-sm">{o.label}</div>
                   {showResult && (isCorrect ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <CheckCircle2 size={22} style={{ color: "#16a34a", flexShrink: 0 }} />
                   ) : selected ? (
-                    <XCircle className="h-4 w-4 text-red-600" />
+                    <XCircle size={22} style={{ color: "#dc2626", flexShrink: 0 }} />
                   ) : null)}
                 </div>
               </button>
