@@ -6,57 +6,33 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
-import JSZip from "jszip";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { UPLOADS_DIR, requireAuth, requireContributor } from "../shared.js";
 import { transporter, SMTP_FROM } from "../email.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const execAsync  = promisify(exec);
+const __filename  = fileURLToPath(import.meta.url);
+const __dirname   = path.dirname(__filename);
+const execAsync   = promisify(exec);
 
 export const router = express.Router();
 
-const upload    = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
-const PDF_SCRIPT = path.join(__dirname, "../pdf_to_images.py");
+const upload      = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+const PPTX_SCRIPT = path.join(__dirname, "../pptx_import.py");
+const PYTHON      = process.env.PYTHON_BIN
+  ? path.resolve(__dirname, "..", process.env.PYTHON_BIN)
+  : "python";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function pdfToImages(pdfBuffer, outDir, W = 1920, H = 1080) {
-  const tmpPdf = path.join(outDir, "_upload.pdf");
-  fs.writeFileSync(tmpPdf, pdfBuffer);
+async function pptxImport(pptxBuffer, outDir, W = 1920, H = 1080) {
+  const tmpPptx = path.join(outDir, "_upload.pptx");
+  fs.writeFileSync(tmpPptx, pptxBuffer);
   try {
-    const { stdout } = await execAsync(`python "${PDF_SCRIPT}" "${tmpPdf}" "${outDir}" ${W} ${H}`);
+    const { stdout } = await execAsync(`"${PYTHON}" "${PPTX_SCRIPT}" "${tmpPptx}" "${outDir}" ${W} ${H}`, { timeout: 300000 });
     return JSON.parse(stdout.trim());
   } finally {
-    fs.unlinkSync(tmpPdf);
+    if (fs.existsSync(tmpPptx)) fs.unlinkSync(tmpPptx);
   }
-}
-
-async function extractPptxNotes(pptxBuffer) {
-  const zip      = await JSZip.loadAsync(pptxBuffer);
-  const presXml  = await zip.file("ppt/presentation.xml")?.async("string") ?? "";
-  const presRels = await zip.file("ppt/_rels/presentation.xml.rels")?.async("string") ?? "";
-  const rIdToSlide = {};
-  for (const m of presRels.matchAll(/Id="(rId\d+)"[^>]*Target="slides\/(slide\d+\.xml)"/g))
-    rIdToSlide[m[1]] = m[2];
-  const slideOrder = [...presXml.matchAll(/<p:sldId[^>]+r:id="(rId\d+)"/g)].map(m => m[1]);
-  const notes = [];
-  for (const rId of slideOrder) {
-    const slideName = rIdToSlide[rId];
-    if (!slideName) { notes.push(""); continue; }
-    const slideNum  = slideName.match(/slide(\d+)\.xml/)?.[1];
-    const slideRels = await zip.file(`ppt/slides/_rels/slide${slideNum}.xml.rels`)?.async("string") ?? "";
-    const noteFile  = slideRels.match(/Target="\.\.\/notesSlides\/(notesSlide\d+\.xml)"/)?.[1];
-    if (!noteFile) { notes.push(""); continue; }
-    const noteXml = await zip.file(`ppt/notesSlides/${noteFile}`)?.async("string") ?? "";
-    const cleaned = noteXml
-      .replace(/<p:sp>(?:(?!<\/p:sp>)[\s\S])*?type="sldImg"(?:(?!<\/p:sp>)[\s\S])*?<\/p:sp>/g, "")
-      .replace(/<p:sp>(?:(?!<\/p:sp>)[\s\S])*?type="sldNum"(?:(?!<\/p:sp>)[\s\S])*?<\/p:sp>/g, "");
-    const text = [...cleaned.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map(m => m[1].trim()).filter(Boolean).join(" ");
-    notes.push(text);
-  }
-  return notes;
 }
 
 function buildContentFile(notes, images, quizEnabled = false) {
@@ -110,18 +86,17 @@ router.get("/api/presentation-data", (req, res) => {
 // ── Import ────────────────────────────────────────────────────────────────────
 router.post("/api/presentations/import",
   requireAuth, requireContributor,
-  upload.fields([{ name: "pptx", maxCount: 1 }, { name: "pdf", maxCount: 1 }]),
+  upload.fields([{ name: "pptx", maxCount: 1 }]),
   async (req, res) => {
     const { name, description, language } = req.body;
-    if (!name?.trim())        return res.status(400).json({ error: "Name is required" });
-    if (!req.files?.pdf?.[0]) return res.status(400).json({ error: "PDF file is required" });
+    if (!name?.trim())          return res.status(400).json({ error: "Name is required" });
+    if (!req.files?.pptx?.[0]) return res.status(400).json({ error: "PPTX file is required" });
     const safeName = name.trim();
     const outDir   = path.join(UPLOADS_DIR, safeName);
     fs.mkdirSync(outDir, { recursive: true });
     try {
-      const longLang = language || "english";
-      const images   = await pdfToImages(req.files.pdf[0].buffer, outDir);
-      let notes = req.files?.pptx?.[0] ? await extractPptxNotes(req.files.pptx[0].buffer) : images.map(() => "No slide notes");
+      const longLang       = language || "english";
+      const { images, notes } = await pptxImport(req.files.pptx[0].buffer, outDir);
       fs.writeFileSync(path.join(outDir, `content_${longLang}.txt`), buildContentFile(notes, images), "utf-8");
       const filesData = readFilesJson();
       filesData.files = filesData.files.filter(f => f.name !== safeName);

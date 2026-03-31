@@ -19,7 +19,6 @@ export function CreatePresentationDialog({
   const [description, setDescription] = useState("");
   const [lang, setLang] = useState(defaultLang);
   const [pptxFile, setPptxFile] = useState<File | null>(null);
-  const [pdfFile, setPdfFile]   = useState<File | null>(null);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
@@ -28,12 +27,12 @@ export function CreatePresentationDialog({
   useEffect(() => {
     if (open) {
       setLang(defaultLang); setName(""); setDescription("");
-      setPptxFile(null); setPdfFile(null); setImportError(""); setShowSummarizeConfirm(false);
+      setPptxFile(null); setImportError(""); setShowSummarizeConfirm(false);
     }
   }, [open, defaultLang]);
 
   async function doImport(summarize: "gemini" | "none") {
-    if (!name.trim() || !pdfFile) return;
+    if (!name.trim() || !pptxFile) return;
     setShowSummarizeConfirm(false);
     setImporting(true); setImportError("");
     try {
@@ -42,8 +41,7 @@ export function CreatePresentationDialog({
       form.append("description", description.trim());
       const longLang = LANG_TO_LONG[lang] ?? "english";
       form.append("language", longLang);
-      form.append("pdf", pdfFile);
-      if (pptxFile) form.append("pptx", pptxFile);
+      form.append("pptx", pptxFile);
       const res  = await fetch("/api/presentations/import", { method: "POST", credentials: "include", body: form });
       const text = await res.text();
       const data = (() => { try { return JSON.parse(text); } catch { return { error: text || "Import failed" }; } })();
@@ -144,14 +142,7 @@ export function CreatePresentationDialog({
                   </div>
                 </div>
                 <div className="presFieldRow">
-                  <div className="presFieldLabel">PDF file <span style={{color:"#ef4444",fontWeight:700}}>*</span> <span style={{color:"#6b7280",fontWeight:400}}>(slides exported from PowerPoint)</span></div>
-                  <div className="presFileUpload">
-                    <label className="presFileBtn">Choose PDF<input type="file" accept=".pdf" onChange={e => setPdfFile(e.target.files?.[0] ?? null)} className="presFileInput" /></label>
-                    <span className="presFileName">{pdfFile ? pdfFile.name : "No file chosen"}</span>
-                  </div>
-                </div>
-                <div className="presFieldRow">
-                  <div className="presFieldLabel">PPTX file <span style={{color:"#6b7280",fontWeight:400}}>(optional — for slide notes)</span></div>
+                  <div className="presFieldLabel">PPTX file <span style={{color:"#ef4444",fontWeight:700}}>*</span></div>
                   <div className="presFileUpload">
                     <label className="presFileBtn">Choose PPTX<input type="file" accept=".pptx,.ppt" onChange={e => setPptxFile(e.target.files?.[0] ?? null)} className="presFileInput" /></label>
                     <span className="presFileName">{pptxFile ? pptxFile.name : "No file chosen"}</span>
@@ -161,8 +152,8 @@ export function CreatePresentationDialog({
               </div>
               <div className="presFooter">
                 <button className="presCancelBtn" onClick={onClose}>Cancel</button>
-                <button className="presSubmitBtn" disabled={!name.trim() || !pdfFile || importing}
-                  onClick={() => pptxFile ? doImport("none") : setShowSummarizeConfirm(true)}>
+                <button className="presSubmitBtn" disabled={!name.trim() || !pptxFile || importing}
+                  onClick={() => setShowSummarizeConfirm(true)}>
                   {importing ? "Importing…" : "Import"}
                 </button>
               </div>
@@ -181,13 +172,13 @@ export function CreatePresentationDialog({
               exit={{ opacity: 0, y: 10, scale: 0.97 }} transition={{ duration: 0.18 }}
               style={{ position: "relative", zIndex: 301, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: "32px 28px", width: 420, maxWidth: "90vw", boxShadow: "0 40px 80px rgba(0,0,0,0.18)" }}
             >
-              <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 10 }}>No PPTX file selected</div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: "#111827", marginBottom: 10 }}>Slide notes</div>
               <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 24, lineHeight: 1.6 }}>
-                Would you like Google Gemini to analyse each slide image and generate spoken notes automatically?
+                Use the speaker notes from the PPTX, or let Gemini analyse each slide image and generate spoken notes automatically?
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <button className="presSubmitBtn" onClick={() => doImport("gemini")}>Yes — generate notes with Gemini</button>
-                <button className="presCancelBtn" onClick={() => doImport("none")}>No — import without notes</button>
+                <button className="presSubmitBtn" onClick={() => doImport("none")}>Use PPTX speaker notes</button>
+                <button className="presCancelBtn" onClick={() => doImport("gemini")}>Generate notes with Gemini</button>
                 <button className="presCancelBtn" onClick={() => setShowSummarizeConfirm(false)}>Cancel</button>
               </div>
             </motion.div>
