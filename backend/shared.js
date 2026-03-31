@@ -77,6 +77,14 @@ export const stmtGoogleUpsert = db.prepare(`
     last_login = excluded.last_login
 `);
 
+export const stmtLdapUpsert = db.prepare(`
+  INSERT INTO users (id, email, name, provider, verified, last_login)
+  VALUES (?, ?, ?, 'ldap', 1, datetime('now'))
+  ON CONFLICT(id) DO UPDATE SET
+    name       = excluded.name,
+    last_login = excluded.last_login
+`);
+
 // ── Session store ─────────────────────────────────────────────────────────────
 export const sessions    = new Map();
 export const oauthStates = new Map();

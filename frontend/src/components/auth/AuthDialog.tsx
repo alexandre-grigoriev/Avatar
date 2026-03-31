@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Eye, EyeOff } from "lucide-react";
 
-type AuthScreen = "signin" | "register" | "inbox";
+type AuthScreen = "signin" | "register" | "inbox" | "ldap";
 
 function PasswordInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const [show, setShow] = useState(false);
@@ -36,9 +36,10 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [resent, setResent]     = useState(false);
   const [linked, setLinked]     = useState(false);
+  const [ldapUser, setLdapUser] = useState("");
 
   useEffect(() => {
-    if (open) { setScreen("signin"); setEmail(""); setNickname(""); setPassword(""); setConfirm(""); setError(""); setUnverifiedEmail(""); setResent(false); setLinked(false); }
+    if (open) { setScreen("signin"); setEmail(""); setNickname(""); setPassword(""); setConfirm(""); setError(""); setUnverifiedEmail(""); setResent(false); setLinked(false); setLdapUser(""); }
   }, [open]);
 
   async function handleSignIn(e: React.FormEvent) {
@@ -69,6 +70,17 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
     finally { setLoading(false); }
   }
 
+  async function handleLdapLogin(e: React.FormEvent) {
+    e.preventDefault(); setError(""); setLoading(true);
+    try {
+      const res  = await fetch("/api/auth/ldap", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: ldapUser.trim(), password }) });
+      const data = await res.json();
+      if (res.ok) onSuccess();
+      else setError(data.error || "Authentication failed");
+    } catch { setError("Network error. Please try again."); }
+    finally { setLoading(false); }
+  }
+
   async function handleResend() {
     setResent(false);
     try { await fetch("/api/auth/resend-verification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: unverifiedEmail || email.trim() }) }); setResent(true); } catch {}
@@ -83,6 +95,15 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
       </svg>
       <span>Continue with Google</span>
+    </button>
+  );
+
+  const WindowsBtn = () => (
+    <button className="authProviderBtn" type="button" onClick={() => { setScreen("ldap"); setError(""); setPassword(""); }}>
+      <svg viewBox="0 0 24 24" width="20" height="20">
+        <path fill="#00adef" d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+      </svg>
+      <span>Windows / HORIBA account</span>
     </button>
   );
 
@@ -102,7 +123,7 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
               {screen === "signin" && (
                 <form onSubmit={handleSignIn}>
                   <div className="authHeader"><div className="authTitle">Welcome back</div><div className="authSubtitle">Sign in to access AVATAR Platform</div></div>
-                  <GoogleBtn /><Divider />
+                  <WindowsBtn /><GoogleBtn /><Divider />
                   <div className="authField"><div className="authLabel">Email</div><input className="authInput" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" required autoFocus /></div>
                   <div className="authField"><div className="authLabel">Password</div><PasswordInput value={password} onChange={setPassword} /></div>
                   {linked && !error && <div className="authSuccess">Password added! You can now sign in with email or Google.</div>}
@@ -119,7 +140,7 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
               {screen === "register" && (
                 <form onSubmit={handleRegister}>
                   <div className="authHeader"><div className="authTitle">Create account</div><div className="authSubtitle">Register with your email address</div></div>
-                  <GoogleBtn /><Divider />
+                  <WindowsBtn /><GoogleBtn /><Divider />
                   <div className="authField"><div className="authLabel">Nickname <span style={{ color: "#9ca3af", fontWeight: 400 }}>(display name)</span></div><input className="authInput" type="text" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="How should we call you?" autoFocus /></div>
                   <div className="authField"><div className="authLabel">Email</div><input className="authInput" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" required /></div>
                   <div className="authField"><div className="authLabel">Password <span style={{ color: "#9ca3af", fontWeight: 400 }}>(min. 8 characters)</span></div><PasswordInput value={password} onChange={setPassword} placeholder="Choose a password" /></div>
@@ -127,6 +148,17 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
                   {error && <div className="authError">{error}</div>}
                   <button className="authContinue" type="submit" disabled={loading}>{loading ? "Sending…" : "Create account"}</button>
                   <div className="authFooter">Already have an account? <button type="button" className="authLink" onClick={() => { setScreen("signin"); setError(""); }}>Sign in</button></div>
+                </form>
+              )}
+
+              {screen === "ldap" && (
+                <form onSubmit={handleLdapLogin}>
+                  <div className="authHeader"><div className="authTitle">Windows account</div><div className="authSubtitle">Sign in with your HORIBA credentials</div></div>
+                  <div className="authField"><div className="authLabel">Username</div><input className="authInput" type="text" value={ldapUser} onChange={e => setLdapUser(e.target.value)} placeholder="firstname.lastname" required autoFocus autoComplete="username" /></div>
+                  <div className="authField"><div className="authLabel">Password</div><PasswordInput value={password} onChange={setPassword} placeholder="Windows password" /></div>
+                  {error && <div className="authError">{error}</div>}
+                  <button className="authContinue" type="submit" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</button>
+                  <div className="authFooter"><button type="button" className="authLink" onClick={() => { setScreen("signin"); setError(""); }}>Back</button></div>
                 </form>
               )}
 

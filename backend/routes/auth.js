@@ -5,8 +5,9 @@ import express from "express";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { Issuer } from "openid-client";
+import { Client as LdapClient } from "ldapts";
 import {
-  db, sessions, oauthStates, stmtFindByEmail, stmtFindByToken, stmtGoogleUpsert, stmtFindById, stmtUpdateRole,
+  db, sessions, oauthStates, stmtFindByEmail, stmtFindByToken, stmtGoogleUpsert, stmtLdapUpsert, stmtFindById, stmtUpdateRole,
   getSession, createSession, clearSessionCookie, dbUserToSession, makeId, now,
   COOKIE_NAME, FRONTEND_ORIGIN, BCRYPT_ROUNDS, VERIFY_TTL_MS,
   setGoogleClient,
@@ -175,5 +176,81 @@ router.get("/auth/google/callback", async (req, res) => {
   } catch (e) {
     console.error("Google callback error:", e);
     res.status(500).send("OAuth error");
+  }
+});
+
+// ── LDAP / Active Directory login ─────────────────────────────────────────────
+router.post("/api/auth/ldap", async (req, res) => {
+  if (!process.env.LDAP_ENABLED || process.env.LDAP_ENABLED === "false")
+    return res.status(503).json({ error: "LDAP authentication is not enabled" });
+
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ error: "Username and password are required" });
+
+  const ldapUrl    = process.env.LDAP_URL;
+  const domain     = process.env.LDAP_DOMAIN;
+  const baseDn     = process.env.LDAP_BASE_DN;
+  const searchAttr = process.env.LDAP_SEARCH_ATTR || "sAMAccountName";
+  // If user typed full email, use as-is; otherwise append domain
+  const upn        = username.includes("@") ? username : `${username}@${domain}`;
+  // sAMAccountName is always the part before @
+  const samAccount = username.includes("@") ? username.split("@")[0] : username;
+
+  const isLdaps = ldapUrl.startsWith("ldaps://");
+  const client = new LdapClient({
+    url: ldapUrl,
+    connectTimeout: 5000,
+    tlsOptions: isLdaps ? { rejectUnauthorized: false } : undefined,
+  });
+  try {
+    // Authenticate by binding with user credentials
+    await client.bind(upn, password);
+
+    // Fetch user details from the directory
+    let displayName = username;
+    let email       = upn;
+    try {
+      const { searchEntries } = await client.search(baseDn, {
+        filter: `(${searchAttr}=${samAccount})`,
+        attributes: ["displayName", "cn", "mail", "userPrincipalName"],
+        sizeLimit: 1,
+      });
+      if (searchEntries.length > 0) {
+        const entry = searchEntries[0];
+        displayName = String(entry.displayName || entry.cn || username);
+        email       = String(entry.mail || entry.userPrincipalName || upn);
+      }
+    } catch (searchErr) {
+      console.warn("[LDAP] Could not fetch user details, using defaults:", searchErr.message);
+    }
+
+    await client.unbind();
+
+    // Upsert into local DB — reuse existing account if email already known
+    const existing = stmtFindByEmail.get(email);
+    let dbUser;
+    if (existing) {
+      db.prepare("UPDATE users SET name=COALESCE(?,name), provider='ldap', verified=1, last_login=datetime('now') WHERE id=?")
+        .run(displayName || null, existing.id);
+      dbUser = stmtFindById.get(existing.id);
+    } else {
+      const userId = "ldap-" + samAccount.toLowerCase();
+      stmtLdapUpsert.run(userId, email, displayName);
+      dbUser = stmtFindById.get(userId);
+    }
+    createSession(res, dbUserToSession(dbUser));
+    res.json({ ok: true });
+  } catch (e) {
+    try { await client.unbind(); } catch {}
+    if (e.code === "InvalidCredentialsError" || e.message?.includes("Invalid Credentials") || e.message?.includes("invalidCredentials")) {
+      return res.status(401).json({ error: "Invalid Windows username or password" });
+    }
+    console.error("[LDAP] Login error — code:", e.code, "| lde_message:", e.lde_message, "| message:", e.message);
+    const msg = e.message?.includes("ECONNREFUSED") ? `Cannot reach LDAP server (${ldapUrl})` :
+                e.message?.includes("ETIMEDOUT")    ? `LDAP server timeout (${ldapUrl})` :
+                e.message?.includes("ENOTFOUND")    ? `LDAP server not found (${ldapUrl})` :
+                "LDAP connection failed. Please contact IT.";
+    res.status(500).json({ error: msg });
   }
 });
