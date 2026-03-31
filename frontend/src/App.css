@@ -149,7 +149,7 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
   overflow:hidden;
 }
 .userMenuTop{ padding: 12px; border-bottom:1px solid var(--border); }
-.userMenuActions{ padding: 10px; }
+.userMenuActions{ padding: 10px; display: flex; flex-direction: column; gap: 5px; }
 .userRoleBadge{
   display: inline-block;
   margin-top: 6px;
@@ -664,6 +664,11 @@ body{ margin:0; background:var(--bg); color:var(--text); font-family: Inter, sys
 
 .presModalHeader{ padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
 .presModalDivider{ border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+.kbTabs{ display:flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); margin-bottom: 0; margin-top: 16px; }
+.kbTab{ background: none; border: none; padding: 8px 16px; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.kbTab:hover{ color: #111827; }
+.kbTabActive{ color: #478cd0; border-bottom-color: #478cd0; }
 .presBackBtn{ display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280; background: none; border: none; cursor: pointer; margin-bottom: 12px; padding: 0; }
 .presBackBtn:hover{ color: #111827; }
 .presModalTitle{ font-size: 19px; font-weight: 500; color: #111827; margin-bottom: 4px; text-align: left; }

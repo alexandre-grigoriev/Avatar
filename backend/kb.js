@@ -120,8 +120,8 @@ function chunkText(text) {
 
 // ── LLM enrichment + entity extraction (single Gemini call per chunk) ──────────
 
-async function enrichChunk(rawChunk, docSummary, prevChunk, index, total, filename) {
-  const prompt = `Tu traites un extrait de document RH "${filename}".
+async function enrichChunk(rawChunk, docSummary, prevChunk, index, total, filename, documentDate) {
+  const prompt = `Tu traites un extrait de document RH "${filename}"${documentDate ? ` daté du ${documentDate}` : ""}.
 Résumé du document : ${docSummary}
 Extrait précédent : ${prevChunk || "(début du document)"}
 Extrait ${index + 1}/${total} :
@@ -157,7 +157,7 @@ async function summarizeDocument(text, filename) {
 
 // ── Ingestion ──────────────────────────────────────────────────────────────────
 
-export async function ingestDocument({ buffer, filename, uploadedBy }) {
+export async function ingestDocument({ buffer, filename, uploadedBy, documentDate }) {
   const docId = crypto.randomUUID();
 
   // 1. Extract text from PDF
@@ -184,16 +184,17 @@ export async function ingestDocument({ buffer, filename, uploadedBy }) {
     CREATE (d:KBDocument {
       id: $id, filename: $filename, lang: $lang,
       summary: $summary, uploadedBy: $uploadedBy,
-      uploadedAt: datetime(), chunkCount: $chunkCount
+      uploadedAt: datetime(), chunkCount: $chunkCount,
+      documentDate: $documentDate
     })
-  `, { id: docId, filename, lang, summary, uploadedBy, chunkCount: rawChunks.length });
+  `, { id: docId, filename, lang, summary, uploadedBy, chunkCount: rawChunks.length, documentDate: documentDate || null });
 
   // 6. Process chunks sequentially (to have prevChunk context)
   const chunkIds = [];
   for (let i = 0; i < rawChunks.length; i++) {
     const prevChunk = i > 0 ? rawChunks[i - 1].slice(-200) : null;
     const { enriched, entities, relations } = await enrichChunk(
-      rawChunks[i], summary, prevChunk, i, rawChunks.length, filename
+      rawChunks[i], summary, prevChunk, i, rawChunks.length, filename, documentDate
     );
 
     // Embed enriched text
@@ -262,7 +263,7 @@ export async function searchKnowledgeBase(query, topK = 6) {
       CALL db.index.vector.queryNodes('kb_chunk_embedding', $k, $emb)
       YIELD node AS c, score
       MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
-      RETURN c.id AS id, c.text_original AS text, score, 'chunk_vector' AS strategy, d.filename AS filename
+      RETURN c.id AS id, c.text_original AS text, score, 'chunk_vector' AS strategy, d.filename AS filename, d.documentDate AS documentDate
     `, { k: topK, emb: queryEmbedding }).catch(() => []),
 
     // Strategy 2: vector search on entities → get their chunks
@@ -271,7 +272,7 @@ export async function searchKnowledgeBase(query, topK = 6) {
       YIELD node AS e, score
       MATCH (c:KBChunk)-[:MENTIONS]->(e)
       MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
-      RETURN DISTINCT c.id AS id, c.text_original AS text, score * 0.9 AS score, 'entity_vector' AS strategy, d.filename AS filename
+      RETURN DISTINCT c.id AS id, c.text_original AS text, score * 0.9 AS score, 'entity_vector' AS strategy, d.filename AS filename, d.documentDate AS documentDate
     `, { emb: queryEmbedding }).catch(() => []),
 
     // Strategy 3: graph traversal — entities related to top entities
@@ -281,7 +282,7 @@ export async function searchKnowledgeBase(query, topK = 6) {
       MATCH (e)-[:RELATED_TO*1..2]-(related:KBEntity)
       MATCH (c:KBChunk)-[:MENTIONS]->(related)
       MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
-      RETURN DISTINCT c.id AS id, c.text_original AS text, 0.6 AS score, 'graph_traversal' AS strategy, d.filename AS filename
+      RETURN DISTINCT c.id AS id, c.text_original AS text, 0.6 AS score, 'graph_traversal' AS strategy, d.filename AS filename, d.documentDate AS documentDate
     `, { emb: queryEmbedding }).catch(() => []),
   ]);
 
@@ -289,12 +290,13 @@ export async function searchKnowledgeBase(query, topK = 6) {
   const scoreMap = new Map();
   for (const records of [s1, s2, s3]) {
     for (const r of records) {
-      const id       = r.get("id");
-      const score    = r.get("score");
-      const text     = r.get("text");
-      const filename = r.get("filename") ?? null;
+      const id           = r.get("id");
+      const score        = r.get("score");
+      const text         = r.get("text");
+      const filename     = r.get("filename") ?? null;
+      const documentDate = r.get("documentDate") ?? null;
       if (!scoreMap.has(id) || scoreMap.get(id).score < score) {
-        scoreMap.set(id, { id, text, score, filename });
+        scoreMap.set(id, { id, text, score, filename, documentDate });
       }
     }
   }
@@ -317,8 +319,8 @@ export async function searchKnowledgeBase(query, topK = 6) {
     if (neighbors[0]) {
       const prev = neighbors[0].get("prevText");
       const next = neighbors[0].get("nextText");
-      if (prev) expanded.set(`${chunk.id}_prev`, { text: prev, score: chunk.score * 0.7, filename: chunk.filename });
-      if (next) expanded.set(`${chunk.id}_next`, { text: next, score: chunk.score * 0.7, filename: chunk.filename });
+      if (prev) expanded.set(`${chunk.id}_prev`, { text: prev, score: chunk.score * 0.7, filename: chunk.filename, documentDate: chunk.documentDate });
+      if (next) expanded.set(`${chunk.id}_next`, { text: next, score: chunk.score * 0.7, filename: chunk.filename, documentDate: chunk.documentDate });
     }
   }
 
@@ -326,7 +328,7 @@ export async function searchKnowledgeBase(query, topK = 6) {
     .sort((a, b) => b.score - a.score)
     .slice(0, topK + 2)
     .filter(c => c.text)
-    .map(c => ({ text: c.text, filename: c.filename }));
+    .map(c => ({ text: c.text, filename: c.filename, documentDate: c.documentDate }));
 }
 
 // ── Translation ────────────────────────────────────────────────────────────────
@@ -350,7 +352,7 @@ ${joined}`;
   try {
     const result = await callGemini(prompt);
     const parts  = result.split(/\n?---\n?/).map(p => p.replace(/^\[\d+\]\s*/, "").trim()).filter(Boolean);
-    return chunkObjs.map((c, i) => ({ ...c, text: parts[i] ?? c.text }));
+    return chunkObjs.map((c, i) => ({ text: parts[i] ?? c.text, filename: c.filename, documentDate: c.documentDate }));
   } catch {
     return chunkObjs; // fallback: return untranslated
   }
@@ -363,15 +365,17 @@ export async function listDocuments() {
     MATCH (d:KBDocument)
     RETURN d.id AS id, d.filename AS filename, d.lang AS lang,
            d.summary AS summary, d.uploadedAt AS uploadedAt,
-           d.uploadedBy AS uploadedBy, d.chunkCount AS chunkCount
+           d.uploadedBy AS uploadedBy, d.chunkCount AS chunkCount,
+           d.documentDate AS documentDate
     ORDER BY d.uploadedAt DESC
   `);
   return records.map(r => ({
-    id:          r.get("id"),
-    filename:    r.get("filename"),
-    lang:        r.get("lang"),
-    summary:     r.get("summary"),
-    uploadedAt:  r.get("uploadedAt"),
+    id:           r.get("id"),
+    filename:     r.get("filename"),
+    lang:         r.get("lang"),
+    summary:      r.get("summary"),
+    uploadedAt:   r.get("uploadedAt"),
+    documentDate: r.get("documentDate"),
     uploadedBy:  r.get("uploadedBy"),
     chunkCount:  neo4j.integer.toNumber(r.get("chunkCount") ?? 0),
   }));

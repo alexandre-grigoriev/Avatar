@@ -292,20 +292,21 @@ export default function App() {
                         <>
                           <button className="ghostBtn w-full" style={{ justifyContent: "flex-start" }}
                             onClick={() => { setCreatePresDialogOpen(true); setUserMenuOpen(false); }}>
-                            + Create presentation
+                            +  Create presentation...
                           </button>
                           <button className="ghostBtn w-full" style={{ justifyContent: "flex-start" }}
                             onClick={() => { setEditPresDialogOpen(true); setUserMenuOpen(false); }}>
-                            ✎ Edit presentations
+                            ✎  Edit presentations...
                           </button>
                         </>
                       )}
                       {user.role === "admin" && (
                         <button className="ghostBtn w-full" style={{ justifyContent: "flex-start" }}
                           onClick={() => { setAddPdfOpen(true); setUserMenuOpen(false); }}>
-                          ⊕ Add PDF to knowledge base…
+                          ⊕  Knowledge base…
                         </button>
                       )}
+                      <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "5px 0" }} />
                       <button className="ghostBtn w-full"
                         onClick={async () => {
                           try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}

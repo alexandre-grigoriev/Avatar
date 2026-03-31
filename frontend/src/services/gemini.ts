@@ -302,8 +302,10 @@ ${combined}`;
   }
 }
 
+interface KBSource { filename: string; documentDate: string | null; }
+
 /** Fetch relevant knowledge base chunks for a query (Graph RAG retrieval) */
-async function fetchKnowledgeBaseContext(message: string, lang: string): Promise<{ context: string; sources: string[] }> {
+async function fetchKnowledgeBaseContext(message: string, lang: string): Promise<{ context: string; sources: KBSource[] }> {
   try {
     const res = await fetch("/api/knowledge-base/search", {
       method: "POST",
@@ -314,8 +316,7 @@ async function fetchKnowledgeBaseContext(message: string, lang: string): Promise
     if (!res.ok) return { context: "", sources: [] };
     const data = await res.json();
     if (!Array.isArray(data.chunks) || !data.chunks.length) return { context: "", sources: [] };
-    const sources: string[] = Array.isArray(data.sources) ? data.sources : [];
-    const sourceIndex = sources.map((s, i) => `[${i + 1}] ${s}`).join(", ");
+    const sources: KBSource[] = Array.isArray(data.sources) ? data.sources : [];
     const context = data.chunks.map((c: string, i: number) => `[source ${i + 1}] ${c}`).join("\n---\n");
     return { context, sources };
   } catch {
@@ -345,8 +346,9 @@ export async function sendToGemini(
   if (kbContext) {
     system += `\nKnowledge base context (HR documents — use this as primary source):\n${kbContext}\n`;
     if (kbSources.length) {
-      system += `Source documents: ${kbSources.map((s, i) => `[${i + 1}] "${s}"`).join(", ")}\n`;
-      system += `When referencing information from the knowledge base, cite the source document by name (e.g. "selon ${kbSources[0]}"). `;
+      const srcList = kbSources.map((s, i) => `[${i + 1}] "${s.filename}"${s.documentDate ? ` (${s.documentDate})` : ""}`).join(", ");
+      system += `Source documents: ${srcList}\n`;
+      system += `When referencing information from the knowledge base, cite the source document by name and date if available (e.g. "selon ${kbSources[0].filename}${kbSources[0].documentDate ? ` du ${kbSources[0].documentDate}` : ""}"). `;
     }
     system += "If the answer is in the knowledge base context, base your answer strictly on it. ";
     system += "If not found, say so clearly rather than guessing.\n";
