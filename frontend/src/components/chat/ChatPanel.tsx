@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { X, Mic } from "lucide-react";
 import { Card } from "../ui/Card";
 import { QuizWidget } from "../quiz/QuizWidget";
@@ -151,7 +152,9 @@ export function ChatPanel({
                     m.role === "user" ? "msgBubbleUser" : "msgBubbleAsst",
                     m.isAction && "msgBubbleAction"
                   )}>
-                    {m.text}
+                    {m.role === "assistant" && !m.isAction
+                      ? <div className="mdContent"><ReactMarkdown>{m.text}</ReactMarkdown></div>
+                      : m.text}
                   </div>
                 </div>
               ))}

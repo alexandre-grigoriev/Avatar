@@ -14,8 +14,8 @@ import pdfParse from "pdf-parse";
 import crypto from "crypto";
 
 const GEMINI_KEY  = process.env.GEMINI_API_KEY;
-const EMBED_URL   = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent";
-const GEMINI_URL  = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const EMBED_URL   = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
+const GEMINI_URL  = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // ── Neo4j connection ───────────────────────────────────────────────────────────
 
@@ -63,13 +63,13 @@ export async function initKnowledgeBase() {
     await cypher(`
       CREATE VECTOR INDEX kb_chunk_embedding IF NOT EXISTS
       FOR (c:KBChunk) ON (c.embedding)
-      OPTIONS { indexConfig: { \`vector.dimensions\`: 768, \`vector.similarity_function\`: 'cosine' } }
+      OPTIONS { indexConfig: { \`vector.dimensions\`: 3072, \`vector.similarity_function\`: 'cosine' } }
     `).catch(() => {}); // ignore if already exists with different config
 
     await cypher(`
       CREATE VECTOR INDEX kb_entity_embedding IF NOT EXISTS
       FOR (e:KBEntity) ON (e.embedding)
-      OPTIONS { indexConfig: { \`vector.dimensions\`: 768, \`vector.similarity_function\`: 'cosine' } }
+      OPTIONS { indexConfig: { \`vector.dimensions\`: 3072, \`vector.similarity_function\`: 'cosine' } }
     `).catch(() => {});
 
     console.log("[KB] Neo4j schema ready");
@@ -84,11 +84,11 @@ async function embed(text) {
   const res = await fetch(`${EMBED_URL}?key=${GEMINI_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "models/text-embedding-004", content: { parts: [{ text }] } }),
+    body: JSON.stringify({ content: { parts: [{ text }] } }),
   });
   if (!res.ok) throw new Error(`Embedding error: ${res.status}`);
   const data = await res.json();
-  return data.embedding.values; // float[768]
+  return data.embedding.values; // float[3072]
 }
 
 async function callGemini(prompt) {
@@ -261,7 +261,8 @@ export async function searchKnowledgeBase(query, topK = 6) {
     cypher(`
       CALL db.index.vector.queryNodes('kb_chunk_embedding', $k, $emb)
       YIELD node AS c, score
-      RETURN c.id AS id, c.text_original AS text, score, 'chunk_vector' AS strategy
+      MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
+      RETURN c.id AS id, c.text_original AS text, score, 'chunk_vector' AS strategy, d.filename AS filename
     `, { k: topK, emb: queryEmbedding }).catch(() => []),
 
     // Strategy 2: vector search on entities → get their chunks
@@ -269,7 +270,8 @@ export async function searchKnowledgeBase(query, topK = 6) {
       CALL db.index.vector.queryNodes('kb_entity_embedding', 5, $emb)
       YIELD node AS e, score
       MATCH (c:KBChunk)-[:MENTIONS]->(e)
-      RETURN DISTINCT c.id AS id, c.text_original AS text, score * 0.9 AS score, 'entity_vector' AS strategy
+      MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
+      RETURN DISTINCT c.id AS id, c.text_original AS text, score * 0.9 AS score, 'entity_vector' AS strategy, d.filename AS filename
     `, { emb: queryEmbedding }).catch(() => []),
 
     // Strategy 3: graph traversal — entities related to top entities
@@ -278,7 +280,8 @@ export async function searchKnowledgeBase(query, topK = 6) {
       YIELD node AS e
       MATCH (e)-[:RELATED_TO*1..2]-(related:KBEntity)
       MATCH (c:KBChunk)-[:MENTIONS]->(related)
-      RETURN DISTINCT c.id AS id, c.text_original AS text, 0.6 AS score, 'graph_traversal' AS strategy
+      MATCH (d:KBDocument)-[:HAS_CHUNK]->(c)
+      RETURN DISTINCT c.id AS id, c.text_original AS text, 0.6 AS score, 'graph_traversal' AS strategy, d.filename AS filename
     `, { emb: queryEmbedding }).catch(() => []),
   ]);
 
@@ -286,11 +289,12 @@ export async function searchKnowledgeBase(query, topK = 6) {
   const scoreMap = new Map();
   for (const records of [s1, s2, s3]) {
     for (const r of records) {
-      const id    = r.get("id");
-      const score = r.get("score");
-      const text  = r.get("text");
+      const id       = r.get("id");
+      const score    = r.get("score");
+      const text     = r.get("text");
+      const filename = r.get("filename") ?? null;
       if (!scoreMap.has(id) || scoreMap.get(id).score < score) {
-        scoreMap.set(id, { id, text, score });
+        scoreMap.set(id, { id, text, score, filename });
       }
     }
   }
@@ -313,16 +317,16 @@ export async function searchKnowledgeBase(query, topK = 6) {
     if (neighbors[0]) {
       const prev = neighbors[0].get("prevText");
       const next = neighbors[0].get("nextText");
-      if (prev) expanded.set(`${chunk.id}_prev`, { text: prev, score: chunk.score * 0.7 });
-      if (next) expanded.set(`${chunk.id}_next`, { text: next, score: chunk.score * 0.7 });
+      if (prev) expanded.set(`${chunk.id}_prev`, { text: prev, score: chunk.score * 0.7, filename: chunk.filename });
+      if (next) expanded.set(`${chunk.id}_next`, { text: next, score: chunk.score * 0.7, filename: chunk.filename });
     }
   }
 
   return [...expanded.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, topK + 2)
-    .map(c => c.text)
-    .filter(Boolean);
+    .filter(c => c.text)
+    .map(c => ({ text: c.text, filename: c.filename }));
 }
 
 // ── Translation ────────────────────────────────────────────────────────────────
@@ -332,10 +336,12 @@ const LANG_NAMES = {
   ja: "Japanese", zh: "Chinese", ru: "Russian",
 };
 
-export async function translateChunks(chunks, targetLang) {
-  if (targetLang === "fr" || !chunks.length) return chunks;
+export async function translateChunks(chunkObjs, targetLang) {
+  if (!chunkObjs.length) return chunkObjs;
+  const texts = chunkObjs.map(c => c.text);
+  if (targetLang === "fr") return chunkObjs;
   const langName = LANG_NAMES[targetLang] ?? targetLang;
-  const joined   = chunks.map((c, i) => `[${i}] ${c}`).join("\n---\n");
+  const joined   = texts.map((t, i) => `[${i}] ${t}`).join("\n---\n");
   const prompt   = `Translate the following HR document excerpts to ${langName}.
 Keep all names, numbers, dates, legal terms, and article references exactly as-is.
 Return ONLY the translated excerpts in the same [N] format, separated by ---.
@@ -343,10 +349,10 @@ Return ONLY the translated excerpts in the same [N] format, separated by ---.
 ${joined}`;
   try {
     const result = await callGemini(prompt);
-    const parts  = result.split(/\n?---\n?/);
-    return parts.map(p => p.replace(/^\[\d+\]\s*/, "").trim()).filter(Boolean);
+    const parts  = result.split(/\n?---\n?/).map(p => p.replace(/^\[\d+\]\s*/, "").trim()).filter(Boolean);
+    return chunkObjs.map((c, i) => ({ ...c, text: parts[i] ?? c.text }));
   } catch {
-    return chunks; // fallback: return untranslated
+    return chunkObjs; // fallback: return untranslated
   }
 }
 

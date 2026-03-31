@@ -303,7 +303,7 @@ ${combined}`;
 }
 
 /** Fetch relevant knowledge base chunks for a query (Graph RAG retrieval) */
-async function fetchKnowledgeBaseContext(message: string, lang: string): Promise<string> {
+async function fetchKnowledgeBaseContext(message: string, lang: string): Promise<{ context: string; sources: string[] }> {
   try {
     const res = await fetch("/api/knowledge-base/search", {
       method: "POST",
@@ -311,12 +311,15 @@ async function fetchKnowledgeBaseContext(message: string, lang: string): Promise
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: message, lang }),
     });
-    if (!res.ok) return "";
+    if (!res.ok) return { context: "", sources: [] };
     const data = await res.json();
-    if (!Array.isArray(data.chunks) || !data.chunks.length) return "";
-    return data.chunks.map((c: string, i: number) => `[${i + 1}] ${c}`).join("\n---\n");
+    if (!Array.isArray(data.chunks) || !data.chunks.length) return { context: "", sources: [] };
+    const sources: string[] = Array.isArray(data.sources) ? data.sources : [];
+    const sourceIndex = sources.map((s, i) => `[${i + 1}] ${s}`).join(", ");
+    const context = data.chunks.map((c: string, i: number) => `[source ${i + 1}] ${c}`).join("\n---\n");
+    return { context, sources };
   } catch {
-    return "";
+    return { context: "", sources: [] };
   }
 }
 
@@ -333,14 +336,18 @@ export async function sendToGemini(
     .join("\n");
 
   // Fetch knowledge base context in parallel with building the prompt
-  const kbContext = await fetchKnowledgeBaseContext(message, lang);
+  const { context: kbContext, sources: kbSources } = await fetchKnowledgeBaseContext(message, lang);
 
-  let system = "You are a smart assistant for HORIBA. Be concise and helpful.\n";
+  let system = "You are a smart assistant for HORIBA. Be concise and helpful. Format your answers using markdown (use **bold**, bullet lists, etc.) when appropriate.\n";
   if (pList) system += `Available presentations:\n${pList}\n`;
   if (presentationContent)
     system += `Current presentation content:\n${presentationContent}\n`;
   if (kbContext) {
     system += `\nKnowledge base context (HR documents — use this as primary source):\n${kbContext}\n`;
+    if (kbSources.length) {
+      system += `Source documents: ${kbSources.map((s, i) => `[${i + 1}] "${s}"`).join(", ")}\n`;
+      system += `When referencing information from the knowledge base, cite the source document by name (e.g. "selon ${kbSources[0]}"). `;
+    }
     system += "If the answer is in the knowledge base context, base your answer strictly on it. ";
     system += "If not found, say so clearly rather than guessing.\n";
   }

@@ -35,9 +35,11 @@ router.post("/api/knowledge-base/search", requireAuth, express.json(), async (re
   const { query, lang } = req.body;
   if (!query) return res.status(400).json({ error: "query required" });
   try {
-    const chunks     = await searchKnowledgeBase(query);
-    const translated = await translateChunks(chunks, lang ?? "fr");
-    res.json({ chunks: translated });
+    const results    = await searchKnowledgeBase(query);
+    const translated = await translateChunks(results, lang ?? "fr");
+    const chunks     = translated.map(c => c.text);
+    const sources    = [...new Set(translated.map(c => c.filename).filter(Boolean))];
+    res.json({ chunks, sources });
   } catch (e) {
     console.error("[KB] Search error:", e);
     res.json({ chunks: [] });

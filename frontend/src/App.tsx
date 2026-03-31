@@ -60,8 +60,13 @@ export default function App() {
     return slides.map((s, i) => `[Slide ${i + 1}]\n${s.paragraphs.join("\n")}`).join("\n\n");
   }, [slides]);
 
-  const handleSpeak = useCallback((text: string) => { avatarRef.current?.speak(text); }, []);
-  const handleStopSpeaking = useCallback(() => { avatarRef.current?.stopSpeaking(); }, []);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const handleSpeak = useCallback((text: string) => {
+    setIsSpeaking(true);
+    avatarRef.current?.speak(text);
+    avatarRef.current?.waitUntilDone().then(() => setIsSpeaking(false));
+  }, []);
+  const handleStopSpeaking = useCallback(() => { setIsSpeaking(false); avatarRef.current?.stopSpeaking(); }, []);
   const handleWaitUntilDone = useCallback(() => avatarRef.current?.waitUntilDone() ?? Promise.resolve(), []);
 
   const [avatarPlayingStyle, setAvatarPlayingStyle] = useState<React.CSSProperties>({});
@@ -324,7 +329,7 @@ export default function App() {
         style={rightOpen ? { gridTemplateColumns: `1fr auto ${rightPanelWidth}px` } : undefined}
       >
         <Card className="leftCard" ref={leftCardRef}>
-          {!isPresentationPlaying && (
+          {(!isPresentationPlaying || view === "chat") && (
             <div className="leftHeader">
               <div>
                 <div className="leftTitle">{view === "presentation" ? "Presentation" : "Avatar"}</div>
@@ -344,9 +349,14 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-              ) : view === "chat" && !rightOpen ? (
+              ) : view === "chat" ? (
                 <div className="leftHeaderBtns">
-                  <button className="ghostBtn" onClick={openDiscussion}>Chat</button>
+                  {!rightOpen && <button className="ghostBtn" onClick={openDiscussion}>Chat</button>}
+                  {isSpeaking && (
+                    <button className="avatarStopBtn" onClick={handleStopSpeaking} title="Stop speaking">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                    </button>
+                  )}
                 </div>
               ) : null}
             </div>
