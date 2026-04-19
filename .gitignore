@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 
+# Docker secrets (runtime credentials — never commit)
+docker/data/backend.env
+docker/data/users.db
+docker/data/uploads/
+
 # Dependencies
 node_modules/
 

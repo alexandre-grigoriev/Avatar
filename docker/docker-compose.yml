@@ -1,0 +1,51 @@
+services:
+
+  # ── Backend — Node.js / Express ──────────────────────────────────────────────
+  backend:
+    image: aipoclab/avatar-backend:latest
+    build:
+      context: ..                          # project root
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    volumes:
+      # backend.env is mounted read-only so secrets never bake into the image
+      - ./data/backend.env:/app/.env:ro
+      # Persistent data: SQLite DB and presentation uploads
+      - ./data/uploads:/data/uploads
+      - ./data/users.db:/data/users.db
+    environment:
+      UPLOADS_DIR: /data/uploads
+      DB_PATH:     /data/users.db
+    networks:
+      - avatar
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout:  5s
+      retries:  5
+      start_period: 20s
+
+  # ── Frontend — React SPA served by Nginx (also reverse-proxies the backend) ─
+  frontend:
+    image: aipoclab/avatar-frontend:latest
+    build:
+      context: ..                          # project root
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        # Gemini key is embedded at build time (used directly from the browser)
+        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - /etc/ssl/avatar:/etc/ssl/avatar:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - avatar
+
+networks:
+  avatar:
+    driver: bridge

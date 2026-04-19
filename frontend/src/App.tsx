@@ -205,6 +205,7 @@ export default function App() {
 
   function handleViewChange(newView: "chat" | "presentation") {
     setView(newView);
+    if (newView === "chat") setPanelMode("discussion");
     if (!rightOpen) setRightOpen(true);
   }
 

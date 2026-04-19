@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — install & compile native addons
+# (bcrypt, better-sqlite3, and canvas all need build-essential + python3 + Cairo)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:22-bookworm-slim AS deps
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — lean runtime image with Python + LibreOffice for PPTX conversion
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:22-bookworm-slim
+
+# Runtime libs for the canvas native addon
+# + Python ecosystem for pptx_import.py (LibreOffice) and pdf_to_images.py (PyMuPDF)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgif7 \
+    libjpeg62-turbo \
+    librsvg2-2 \
+    python3 \
+    python3-venv \
+    libreoffice-impress \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python packages in a venv — avoids pip/system conflicts (PEP 668)
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --timeout 120 --retries 5 \
+    python-pptx pdf2image PyMuPDF Pillow
+
+WORKDIR /app
+
+# Copy compiled node_modules from the build stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy application source
+COPY backend/ ./
+
+# /data is the external mount point for users.db and uploads/
+RUN mkdir -p /data/uploads
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "server.js"]
