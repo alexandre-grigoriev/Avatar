@@ -3,6 +3,8 @@ import { useRef, useState } from "react";
 const LANG_MAP: Record<string, string> = {
   en: "en-US",
   fr: "fr-FR",
+  es: "es-ES",
+  pt: "pt-PT",
   ar: "ar-SA",
   ja: "ja-JP",
   zh: "zh-CN",

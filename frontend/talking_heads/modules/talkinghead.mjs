@@ -794,10 +794,10 @@ class TalkingHead {
     // Setup Google text-to-speech
     if ( this.opt.ttsEndpoint ) {
       let audio = new Audio();
-      if (audio.canPlayType("audio/ogg")) {
-        this.ttsAudioEncoding = "OGG-OPUS";
-      } else if (audio.canPlayType("audio/mp3")) {
+      if (audio.canPlayType("audio/mp3")) {
         this.ttsAudioEncoding = "MP3";
+      } else if (audio.canPlayType("audio/ogg")) {
+        this.ttsAudioEncoding = "OGG-OPUS";
       } else {
         throw new Error("There was no support for either OGG or MP3 audio.");
       }

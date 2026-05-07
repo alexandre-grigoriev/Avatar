@@ -154,7 +154,7 @@ export function AuthDialog({ open, onBeginOAuth, onSuccess, onClose }: {
               {screen === "ldap" && (
                 <form onSubmit={handleLdapLogin}>
                   <div className="authHeader"><div className="authTitle">Windows account</div><div className="authSubtitle">Sign in with your HORIBA credentials</div></div>
-                  <div className="authField"><div className="authLabel">Username</div><input className="authInput" type="text" value={ldapUser} onChange={e => setLdapUser(e.target.value)} placeholder="lastname (e.g. grigoriev)" required autoFocus autoComplete="username" /></div>
+                  <div className="authField"><div className="authLabel">Username</div><input className="authInput" type="text" value={ldapUser} onChange={e => setLdapUser(e.target.value)} placeholder="lastname" required autoFocus autoComplete="username" /></div>
                   <div className="authField"><div className="authLabel">Password</div><PasswordInput value={password} onChange={setPassword} placeholder="Windows password" /></div>
                   {error && <div className="authError">{error}</div>}
                   <button className="authContinue" type="submit" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</button>

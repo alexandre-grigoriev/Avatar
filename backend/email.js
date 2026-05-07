@@ -3,35 +3,83 @@
  */
 import "dotenv/config";
 import dns from "dns";
+import os from "os";
 import nodemailer from "nodemailer";
 import { APP_BASE_URL, FRONTEND_ORIGIN } from "./shared.js";
 
 export const SMTP_FROM = process.env.SMTP_FROM ||
   (process.env.SMTP_USER ? `"AVATAR Platform" <${process.env.SMTP_USER}>` : '"AVATAR Platform" <noreply@avatar.horiba.com>');
 
-const _smtpHostResolved = process.env.SMTP_HOST
+const _smtpHost = process.env.SMTP_HOST || null;
+const _smtpPort = parseInt(process.env.SMTP_PORT || "465");
+// Default: SSL (secure=true) when port 465, STARTTLS (false) otherwise
+const _smtpSecure = process.env.SMTP_SECURE !== undefined
+  ? process.env.SMTP_SECURE === "true"
+  : _smtpPort === 465;
+
+// SMTP_SOURCE_IFACE: name of the network interface to bind outgoing SMTP connections to.
+// Used when the server has multiple NICs and only one (e.g. a WiFi adapter named
+// "horiba_restricted") can reach the SMTP server (Gmail port 465).
+function getIfaceIp(ifaceName) {
+  if (!ifaceName) return null;
+  const ifaces = os.networkInterfaces();
+  const entries = ifaces[ifaceName];
+  if (!entries) {
+    console.warn(`SMTP_SOURCE_IFACE="${ifaceName}" not found. Available: ${Object.keys(ifaces).join(", ")}`);
+    return null;
+  }
+  const ipv4 = entries.find(a => a.family === "IPv4" && !a.internal);
+  if (!ipv4) { console.warn(`SMTP_SOURCE_IFACE="${ifaceName}": no IPv4 address found`); return null; }
+  console.log(`SMTP source address: ${ipv4.address} (${ifaceName})`);
+  return ipv4.address;
+}
+
+// Both containers run with network_mode:host so the container sees all host interfaces.
+// SMTP_SOURCE_IFACE resolves to the actual host NIC IP (e.g. wlo1 → 172.31.181.133).
+// SMTP_SOURCE_IP is an explicit override if interface lookup is not desired.
+const _localAddress =
+  getIfaceIp(process.env.SMTP_SOURCE_IFACE || null) ||
+  process.env.SMTP_SOURCE_IP ||
+  null;
+
+// For SSL (port 465) use the hostname directly so SNI works correctly.
+// For plain/STARTTLS, pre-resolve to IPv4 for internal servers that don't respond on IPv6.
+const _smtpHostResolved = _smtpHost && !_smtpSecure
   ? await new Promise((resolve) =>
-      dns.resolve4(process.env.SMTP_HOST, (err, addrs) => {
-        const ip = !err && addrs?.length ? addrs[0] : process.env.SMTP_HOST;
-        if (!err) console.log(`SMTP ${process.env.SMTP_HOST} → ${ip} (IPv4)`);
+      dns.resolve4(_smtpHost, (err, addrs) => {
+        const ip = !err && addrs?.length ? addrs[0] : _smtpHost;
+        if (!err) console.log(`SMTP ${_smtpHost} → ${ip} (IPv4)`);
         resolve(ip);
       })
     )
-  : null;
+  : _smtpHost;
+
+if (_smtpHost) {
+  console.log("── SMTP config ───────────────────────────────────");
+  console.log("  host    :", _smtpHostResolved);
+  console.log("  port    :", _smtpPort, _smtpSecure ? "(SSL)" : "(STARTTLS)");
+  console.log("  user    :", process.env.SMTP_USER || "(none)");
+  console.log("  from    :", SMTP_FROM);
+  console.log("  localIP :", _localAddress || "(not bound — any interface)");
+  console.log("──────────────────────────────────────────────────");
+} else {
+  console.log("SMTP not configured — emails printed to console only.");
+}
 
 export const transporter = nodemailer.createTransport(
   _smtpHostResolved
     ? {
         host:              _smtpHostResolved,
-        port:              parseInt(process.env.SMTP_PORT || "587"),
-        secure:            process.env.SMTP_SECURE === "true",
-        connectionTimeout: 5_000,
-        greetingTimeout:   5_000,
-        socketTimeout:     5_000,
+        port:              _smtpPort,
+        secure:            _smtpSecure,
+        localAddress:      _localAddress || undefined,
+        connectionTimeout: 30_000,
+        greetingTimeout:   30_000,
+        socketTimeout:     60_000,
         auth: process.env.SMTP_USER
           ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
           : undefined,
-        tls: { rejectUnauthorized: false },
+        tls: { servername: _smtpHost, rejectUnauthorized: false },
       }
     : { jsonTransport: true }
 );

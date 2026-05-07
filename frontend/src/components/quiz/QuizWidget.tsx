@@ -32,6 +32,7 @@ export function QuizWidget({
   const [validated, setValidated] = useState<Record<number, boolean>>({});
   const [sendTo, setSendTo] = useState("alexandre.grigoriev@horiba.com");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!presentationContent && !presentationName) return;
@@ -92,6 +93,7 @@ export function QuizWidget({
   };
 
   const handleSubmit = async () => {
+    setSubmitting(true);
     let score = 0;
     const lines: string[] = [
       `Quiz Results — ${presentationName}`,
@@ -117,6 +119,7 @@ export function QuizWidget({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, subject: `Quiz Results — ${presentationName}`, text: lines.join("\n") }),
     });
+    setSubmitting(false);
     setSubmitted(true);
   };
 
@@ -180,11 +183,11 @@ export function QuizWidget({
         {showResult && q.explanation && <div className="mt-3 text-xs text-gray-600">{q.explanation}</div>}
       </div>
       <div className="quizFooter">
-        <button className="ghostBtn" disabled={idx === 0} onClick={() => setIdx((i) => i - 1)}>Previous</button>
+        <button className="ghostBtn" disabled={idx === 0 || submitting} onClick={() => setIdx((i) => i - 1)}>Previous</button>
         {isMultiple && !isValidated
           ? <button className="blueBtn" disabled={selectedIds.length === 0} onClick={() => setValidated((v) => ({ ...v, [idx]: true }))}>Validate</button>
           : isLast
-            ? <button className="blueBtn" onClick={handleSubmit}>Submit</button>
+            ? <button className="blueBtn" disabled={submitting} onClick={handleSubmit}>{submitting ? "Submitting…" : "Submit"}</button>
             : <button className="blueBtn" onClick={() => setIdx((i) => i + 1)}>Next</button>
         }
       </div>

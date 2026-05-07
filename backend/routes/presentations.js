@@ -129,14 +129,16 @@ router.patch("/api/presentations/:name/notes", requireAuth, requireContributor, 
 });
 
 // ── Quiz ──────────────────────────────────────────────────────────────────────
-router.post("/api/quiz/send-results", requireAuth, express.json(), async (req, res) => {
+router.post("/api/quiz/send-results", express.json(), async (req, res) => {
   const { to, subject, text } = req.body;
   if (!to || !subject || !text) return res.status(400).json({ error: "to, subject, text required" });
+  console.log(`── Quiz results email → ${to}`);
   try {
     await transporter.sendMail({ from: SMTP_FROM, to, subject, text });
+    console.log(`✓ Quiz results email sent to ${to}`);
     res.json({ ok: true });
   } catch (e) {
-    console.error("Quiz results mail error:", e.message);
+    console.error(`✗ Quiz results email FAILED (to: ${to}):`, e.message);
     res.status(500).json({ error: "Failed to send email: " + e.message });
   }
 });
@@ -155,6 +157,20 @@ router.post("/api/presentations/:name/quiz", requireAuth, requireContributor, ex
     }
   }
   res.json({ ok: true });
+});
+
+router.patch("/api/presentations/:name/quiz/sendto", requireAuth, requireContributor, express.json(), (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const { sendto } = req.body;
+  if (sendto === undefined) return res.status(400).json({ error: "sendto required" });
+  const qPath = path.join(UPLOADS_DIR, name, "question.json");
+  if (!fs.existsSync(qPath)) return res.status(404).json({ error: "No quiz for this presentation" });
+  try {
+    const data = JSON.parse(fs.readFileSync(qPath, "utf-8"));
+    data.sendto = sendto;
+    fs.writeFileSync(qPath, JSON.stringify(data, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Management ────────────────────────────────────────────────────────────────

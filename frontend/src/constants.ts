@@ -4,16 +4,18 @@ export const AVATARS = [
 ];
 
 export const LANGS = [
-  { id: "en", name: "English"  },
-  { id: "fr", name: "French"   },
-  { id: "ja", name: "Japanese" },
-  { id: "zh", name: "Chinese"  },
-  { id: "ru", name: "Russian"  },
-  { id: "ar", name: "Arabic"   },
+  { id: "en", name: "English"    },
+  { id: "fr", name: "French"     },
+  { id: "es", name: "Spanish"    },
+  { id: "pt", name: "Portuguese" },
+  { id: "ja", name: "Japanese"   },
+  { id: "zh", name: "Chinese"    },
+  { id: "ru", name: "Russian"    },
+  { id: "ar", name: "Arabic"     },
 ];
 
-export const LANG_TO_LONG: Record<string, string> = { en: "english", fr: "french", ar: "arabic", ja: "japanese", zh: "chinese", ru: "russian" };
-export const LONG_TO_LANG: Record<string, string> = { english: "en", french: "fr", arabic: "ar", japanese: "ja", chinese: "zh", russian: "ru" };
+export const LANG_TO_LONG: Record<string, string> = { en: "english", fr: "french", ar: "arabic", ja: "japanese", zh: "chinese", ru: "russian", es: "spanish", pt: "portuguese" };
+export const LONG_TO_LANG: Record<string, string> = { english: "en", french: "fr", arabic: "ar", japanese: "ja", chinese: "zh", russian: "ru", spanish: "es", portuguese: "pt" };
 
 export const UI_STRINGS: Record<string, {
   welcome: string;
@@ -63,6 +65,20 @@ export const UI_STRINGS: Record<string, {
     resuming: "Возобновляю презентацию...",
     switchingChat: "Переключаюсь в режим чата.",
     error: "Извините, произошла ошибка. Пожалуйста, попробуйте ещё раз.",
+  },
+  es: {
+    welcome: "¡Hola! Soy tu asistente HORIBA. ¿En qué puedo ayudarte?",
+    startPresentation: (name) => `Iniciando la presentación: «${name}»`,
+    resuming: "Reanudando la presentación...",
+    switchingChat: "Cambiando al modo de chat.",
+    error: "Lo siento, ocurrió un error. Por favor, inténtalo de nuevo.",
+  },
+  pt: {
+    welcome: "Olá! Sou o seu assistente HORIBA. Como posso ajudá-lo?",
+    startPresentation: (name) => `A iniciar a apresentação: «${name}»`,
+    resuming: "A retomar a apresentação...",
+    switchingChat: "A mudar para o modo de chat.",
+    error: "Desculpe, ocorreu um erro. Por favor, tente novamente.",
   },
 };
 

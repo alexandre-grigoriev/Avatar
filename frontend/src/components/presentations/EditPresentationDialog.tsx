@@ -4,8 +4,8 @@ import { ChevronDown, X } from "lucide-react";
 import { translateContent, translateQuizFileQuestions, type Presentation } from "../../services/gemini";
 import { cn } from "../../utils";
 
-const LANG_LONG_DISPLAY: Record<string, string> = { english: "English", french: "French", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian" };
-const ALL_LONG_LANGS = ["english", "french", "japanese", "chinese", "russian", "arabic"];
+const LANG_LONG_DISPLAY: Record<string, string> = { english: "English", french: "French", spanish: "Spanish", portuguese: "Portuguese", arabic: "Arabic", japanese: "Japanese", chinese: "Chinese", russian: "Russian" };
+const ALL_LONG_LANGS = ["english", "french", "spanish", "portuguese", "japanese", "chinese", "russian", "arabic"];
 
 function EditSelectDropdown({ items, selected, onSelect }: { items: Presentation[]; selected: Presentation | null; onSelect: (p: Presentation) => void; }) {
   const [open, setOpen] = useState(false);
@@ -52,6 +52,9 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
   const [savedMeta, setSavedMeta] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [quizSendTo, setQuizSendTo] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savedEmail, setSavedEmail] = useState(false);
 
   // userRole and defaultLang are available for future use
   void userRole; void defaultLang;
@@ -78,8 +81,15 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
   async function selectPres(p: Presentation) {
     setSelected(p); setEditName(p.name); setEditDesc(p.description);
     setError(""); setAddLangOpen(false); setAddError("");
-    const qRes = await fetch(`/uploads/${encodeURIComponent(p.name)}/question.json`, { method: "HEAD" });
-    setHasQuiz(qRes.ok);
+    const qRes = await fetch(`/uploads/${encodeURIComponent(p.name)}/question.json`);
+    if (qRes.ok) {
+      const qData = await qRes.json().catch(() => ({}));
+      setHasQuiz(true);
+      setQuizSendTo(qData.sendto ?? "");
+    } else {
+      setHasQuiz(false);
+      setQuizSendTo("");
+    }
     setStep("edit");
   }
 
@@ -316,6 +326,35 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
                   );
                 })}
               </div>
+
+              {hasQuiz && (
+                <>
+                  <hr className="presModalDivider" />
+                  <div className="presFieldLabel" style={{ marginBottom: 6 }}>Quiz results email</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      className="presFieldInput" type="email"
+                      value={quizSendTo} onChange={e => { setQuizSendTo(e.target.value); setSavedEmail(false); }}
+                      placeholder="email@example.com"
+                      style={{ flex: 1 }}
+                    />
+                    <button className="presSubmitBtn" disabled={savingEmail} onClick={async () => {
+                      setSavingEmail(true);
+                      const res = await fetch(`/api/presentations/${encodeURIComponent(selected.name)}/quiz/sendto`, {
+                        method: "PATCH", credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ sendto: quizSendTo }),
+                      });
+                      setSavingEmail(false);
+                      if (res.ok) { setSavedEmail(true); setTimeout(() => setSavedEmail(false), 3000); }
+                      else setError("Failed to save email");
+                    }}>
+                      {savingEmail ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                  {savedEmail && <div style={{ fontSize: 12, color: "#16a34a", marginTop: 4 }}>Email saved</div>}
+                </>
+              )}
 
               {availLangs.length > 0 && !addLangOpen && (
                 <button className="presSubmitBtn" style={{ alignSelf: "flex-start", marginTop: 12 }}
