@@ -42,7 +42,7 @@ if (-not $env:VITE_GEMINI_API_KEY) {
 Write-Host "==> Building images (this may take several minutes on first build)..." -ForegroundColor Cyan
 Push-Location $PSScriptRoot
 try {
-    docker compose build
+    docker compose build --no-cache
     if ($LASTEXITCODE -ne 0) { throw "docker compose build failed" }
 
     # Tag a versioned release if requested (:latest already set by compose)

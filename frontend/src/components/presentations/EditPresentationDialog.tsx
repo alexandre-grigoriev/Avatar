@@ -55,6 +55,8 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
   const [quizSendTo, setQuizSendTo] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
   const [savedEmail, setSavedEmail] = useState(false);
+  const [exportingScorm, setExportingScorm] = useState<Record<string, boolean>>({});
+  const [autoAdvanceScorm, setAutoAdvanceScorm] = useState(false);
 
   // userRole and defaultLang are available for future use
   void userRole; void defaultLang;
@@ -115,6 +117,30 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
 
   function downloadFile(url: string, filename: string) {
     const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  }
+
+  async function exportScorm(lang: string) {
+    if (!selected) return;
+    setExportingScorm(prev => ({ ...prev, [lang]: true }));
+    try {
+      const res = await fetch(
+        `/api/presentations/${encodeURIComponent(selected.name)}/export-scorm?lang=${encodeURIComponent(lang)}${autoAdvanceScorm ? "&autoAdvance=1" : ""}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `${selected.name}_${lang}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { setError("Export failed"); }
+    finally { setExportingScorm(prev => ({ ...prev, [lang]: false })); }
   }
 
   async function uploadContent(lang: string, file: File) {
@@ -297,31 +323,48 @@ export function EditPresentationDialog({ open, onClose, userRole, defaultLang }:
 
               <hr className="presModalDivider" />
 
-              <div className="presFieldLabel" style={{ marginBottom: 10 }}>Languages</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div className="presFieldLabel" style={{ marginBottom: 0 }}>Languages</div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", color: "#6b7280" }}>
+                  <input type="checkbox" checked={autoAdvanceScorm} onChange={e => setAutoAdvanceScorm(e.target.checked)} />
+                  Auto-GO (SCORM)
+                </label>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {presentLangs.map((lang, i) => {
                   const isPrimary = i === 0;
                   const quizFile  = isPrimary ? "question.json" : `question_${lang}.json`;
                   const presEnc   = encodeURIComponent(selected.name);
                   return (
-                    <div key={lang} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 14px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8 }}>
-                      <span style={{ fontWeight: 600, minWidth: 80, fontSize: 16 }}>{LANG_LONG_DISPLAY[lang] ?? lang}</span>
-                      <button className="presSubmitBtn" onClick={() => downloadFile(`/uploads/${presEnc}/content_${lang}.txt`, `content_${lang}.txt`)}>↓ Content</button>
-                      <label className="presSubmitBtn" style={{ cursor: "pointer" }}>
-                        ↑ Content<input type="file" accept=".txt" style={{ display: "none" }} onChange={async e => { if (e.target.files?.[0]) { await uploadContent(lang, e.target.files[0]); e.target.value = ""; } }} />
-                      </label>
-                      {hasQuiz && <>
-                        <button className="presSubmitBtn" style={{ marginLeft: 20 }} onClick={() => downloadFile(`/uploads/${presEnc}/${quizFile}`, quizFile)}>↓ Quiz</button>
+                    <div key={lang} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 14px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 600, minWidth: 80, fontSize: 16 }}>{LANG_LONG_DISPLAY[lang] ?? lang}</span>
+                        <button className="presSubmitBtn" onClick={() => downloadFile(`/uploads/${presEnc}/content_${lang}.txt`, `content_${lang}.txt`)}>↓ Content</button>
                         <label className="presSubmitBtn" style={{ cursor: "pointer" }}>
-                          ↑ Quiz<input type="file" accept=".json" style={{ display: "none" }} onChange={async e => { if (e.target.files?.[0]) { await uploadQuiz(lang, e.target.files[0]); e.target.value = ""; } }} />
+                          ↑ Content<input type="file" accept=".txt" style={{ display: "none" }} onChange={async e => { if (e.target.files?.[0]) { await uploadContent(lang, e.target.files[0]); e.target.value = ""; } }} />
                         </label>
-                      </>}
-                      {!isPrimary && (
-                        <button onClick={() => doRemoveLanguage(lang)} title="Remove language"
-                          style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", padding: "2px 6px", color: "#9ca3af", fontSize: 18, lineHeight: 1, borderRadius: 4, display: "flex", alignItems: "center" }}
-                          onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
-                          onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}>✕</button>
-                      )}
+                        {hasQuiz && <>
+                          <button className="presSubmitBtn" style={{ marginLeft: 20 }} onClick={() => downloadFile(`/uploads/${presEnc}/${quizFile}`, quizFile)}>↓ Quiz</button>
+                          <label className="presSubmitBtn" style={{ cursor: "pointer" }}>
+                            ↑ Quiz<input type="file" accept=".json" style={{ display: "none" }} onChange={async e => { if (e.target.files?.[0]) { await uploadQuiz(lang, e.target.files[0]); e.target.value = ""; } }} />
+                          </label>
+                        </>}
+                        {!isPrimary && (
+                          <button onClick={() => doRemoveLanguage(lang)} title="Remove language"
+                            style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", padding: "2px 6px", color: "#9ca3af", fontSize: 18, lineHeight: 1, borderRadius: 4, display: "flex", alignItems: "center" }}
+                            onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
+                            onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}>✕</button>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "center" }}>
+                        <button
+                          className="presSubmitBtn"
+                          disabled={exportingScorm[lang]}
+                          onClick={() => exportScorm(lang)}
+                          title="Export as SCORM 1.2 package with audio">
+                          {exportingScorm[lang] ? "Exporting…" : "⬇ SCORM"}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

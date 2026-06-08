@@ -1,6 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 
-const TTS_API_KEY = import.meta.env.VITE_TTS_API_KEY ?? "AIzaSyBJ0L9hqscxb5fowFHKF_Q-YTvCIcn185c";
+const TTS_API_KEY = import.meta.env.VITE_TTS_API_KEY;
+if (!TTS_API_KEY) throw new Error("VITE_TTS_API_KEY is not set");
 
 const AVATAR_CONFIG: Record<string, Record<string, { url: string; ttsLang: string; ttsVoice: string; lipsyncLang: string; ttsRate?: number }>> = {
   alan: {
